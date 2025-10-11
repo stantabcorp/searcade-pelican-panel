@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\Auth\OAuthController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\SearcadeController;
+use Illuminate\Support\Facades\Route;
 
 Route::redirect('/login', '/login')->name('auth.login');
 

@@ -31,7 +31,7 @@ class ProcessWebhook implements ShouldQueue
     {
         $payload = $this->data;
 
-        if (is_array($payload) && array_key_exists(0, $payload) && count($payload) === 1) {
+        if (array_key_exists(0, $payload) && count($payload) === 1) {
             $payload = $payload[0];
         }
 
