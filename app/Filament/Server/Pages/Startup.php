@@ -17,6 +17,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Validator;
@@ -35,40 +36,56 @@ class Startup extends ServerFormPage
         return parent::form($schema)
             ->columns([
                 'default' => 1,
-                'sm' => 1,
-                'md' => 4,
-                'lg' => 6,
+                'md' => 2,
             ])
             ->components([
                 Hidden::make('previewing')
                     ->default(false),
-                Textarea::make('startup')
+                TextInput::make('custom_startup')
                     ->label(trans('server/startup.command'))
-                    ->columnSpan([
-                        'default' => 1,
-                        'sm' => 1,
-                        'md' => 2,
-                        'lg' => 4,
-                    ])
-                    ->autosize()
-                    ->hintAction(PreviewStartupAction::make())
-                    ->readOnly(),
+                    ->readOnly()
+                    ->visible(fn (Server $server) => !in_array($server->startup, $server->egg->startup_commands))
+                    ->formatStateUsing(fn () => 'Custom Startup')
+                    ->hintAction(PreviewStartupAction::make()),
+                Select::make('startup_select')
+                    ->label(trans('server/startup.command'))
+                    ->live()
+                    ->visible(fn (Server $server) => in_array($server->startup, $server->egg->startup_commands))
+                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_UPDATE, $server))
+                    ->formatStateUsing(fn (Server $server) => $server->startup)
+                    ->afterStateUpdated(function ($state, Server $server, Set $set) {
+                        $original = $server->startup;
+                        $server->forceFill(['startup' => $state])->saveOrFail();
+
+                        $set('startup', $state);
+                        $set('previewing', false);
+
+                        if ($original !== $server->startup) {
+                            $startups = array_flip($server->egg->startup_commands);
+                            Activity::event('server:startup.command')
+                                ->property(['old' => $startups[$original], 'new' => $startups[$state]])
+                                ->log();
+                        }
+
+                        Notification::make()
+                            ->title(trans('server/startup.notification_startup'))
+                            ->body(trans('server/startup.notification_startup_body'))
+                            ->success()
+                            ->send();
+                    })
+                    ->options(fn (Server $server) => array_flip($server->egg->startup_commands))
+                    ->selectablePlaceholder(false)
+                    ->hintAction(PreviewStartupAction::make()),
                 TextInput::make('custom_image')
                     ->label(trans('server/startup.docker_image'))
                     ->readOnly()
                     ->visible(fn (Server $server) => !in_array($server->image, $server->egg->docker_images))
-                    ->formatStateUsing(fn (Server $server) => $server->image)
-                    ->columnSpan([
-                        'default' => 1,
-                        'sm' => 1,
-                        'md' => 2,
-                        'lg' => 2,
-                    ]),
+                    ->formatStateUsing(fn (Server $server) => $server->image),
                 Select::make('image')
                     ->label(trans('server/startup.docker_image'))
                     ->live()
                     ->visible(fn (Server $server) => in_array($server->image, $server->egg->docker_images))
-                    ->disabled(fn (Server $server) => !auth()->user()->can(Permission::ACTION_STARTUP_DOCKER_IMAGE, $server))
+                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_DOCKER_IMAGE, $server))
                     ->afterStateUpdated(function ($state, Server $server) {
                         $original = $server->image;
                         $server->forceFill(['image' => $state])->saveOrFail();
@@ -89,14 +106,12 @@ class Startup extends ServerFormPage
                         $images = $server->egg->docker_images;
 
                         return array_flip($images);
-                    })
-                    ->selectablePlaceholder(false)
-                    ->columnSpan([
-                        'default' => 1,
-                        'sm' => 1,
-                        'md' => 2,
-                        'lg' => 2,
-                    ]),
+                    }),
+                Textarea::make('startup')
+                    ->hiddenLabel()
+                    ->columnSpanFull()
+                    ->autosize()
+                    ->readOnly(),
                 Section::make(trans('server/startup.variables'))
                     ->columnSpanFull()
                     ->schema([
@@ -108,7 +123,7 @@ class Startup extends ServerFormPage
                                 return $query->where('egg_variables.user_viewable', true)->orderByPowerJoins('variable.sort');
                             })
                             ->grid()
-                            ->disabled(fn (Server $server) => !auth()->user()->can(Permission::ACTION_STARTUP_UPDATE, $server))
+                            ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_UPDATE, $server))
                             ->reorderable(false)->addable(false)->deletable(false)
                             ->schema([
                                 StartupVariable::make('variable_value')
@@ -124,12 +139,12 @@ class Startup extends ServerFormPage
 
     protected function authorizeAccess(): void
     {
-        abort_unless(auth()->user()->can(Permission::ACTION_STARTUP_READ, Filament::getTenant()), 403);
+        abort_unless(user()?->can(Permission::ACTION_STARTUP_READ, Filament::getTenant()), 403);
     }
 
     public static function canAccess(): bool
     {
-        return parent::canAccess() && auth()->user()->can(Permission::ACTION_STARTUP_READ, Filament::getTenant());
+        return parent::canAccess() && user()?->can(Permission::ACTION_STARTUP_READ, Filament::getTenant());
     }
 
     public function update(?string $state, ServerVariable $serverVariable): null

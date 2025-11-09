@@ -19,6 +19,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ReplicateAction;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
@@ -42,6 +43,13 @@ class ListEggs extends ListRecords
                 TextColumn::make('id')
                     ->label('Id')
                     ->hidden(),
+                ImageColumn::make('image')
+                    ->label('')
+                    ->alignCenter()
+                    ->circular()
+                    ->getStateUsing(fn ($record) => $record->image
+                        ? $record->image
+                        : 'data:image/svg+xml;base64,' . base64_encode(file_get_contents(public_path('pelican.svg')))),
                 TextColumn::make('name')
                     ->label(trans('admin/egg.name'))
                     ->description(fn ($record): ?string => (strlen($record->description) > 120) ? substr($record->description, 0, 120).'...' : $record->description)
@@ -68,7 +76,7 @@ class ListEggs extends ListRecords
                     ->modal(false)
                     ->excludeAttributes(['author', 'uuid', 'update_url', 'servers_count', 'created_at', 'updated_at'])
                     ->beforeReplicaSaved(function (Egg $replica) {
-                        $replica->author = auth()->user()->email;
+                        $replica->author = user()?->email;
                         $replica->name .= ' Copy';
                         $replica->uuid = Str::uuid()->toString();
                     })

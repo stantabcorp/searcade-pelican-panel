@@ -116,8 +116,16 @@ class CreateServer extends CreateRecord
                                 ->prefixIcon('tabler-server-2')
                                 ->selectablePlaceholder(false)
                                 ->default(function () {
+                                    $lastUsedNode = session()->get('last_utilized_node');
+
+                                    if ($lastUsedNode && user()?->accessibleNodes()->where('id', $lastUsedNode)->exists()) {
+                                        $this->node = Node::find($lastUsedNode);
+
+                                        return $this->node?->id;
+                                    }
+
                                     /** @var ?Node $latestNode */
-                                    $latestNode = auth()->user()->accessibleNodes()->latest()->first();
+                                    $latestNode = user()?->accessibleNodes()->latest()->first();
                                     $this->node = $latestNode;
 
                                     return $this->node?->id;
@@ -128,7 +136,7 @@ class CreateServer extends CreateRecord
                                     'md' => 2,
                                 ])
                                 ->live()
-                                ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', auth()->user()->accessibleNodes()->pluck('id')))
+                                ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', user()?->accessibleNodes()->pluck('id')))
                                 ->searchable()
                                 ->required()
                                 ->preload()
@@ -141,7 +149,7 @@ class CreateServer extends CreateRecord
                                 ->preload()
                                 ->prefixIcon('tabler-user')
                                 ->selectablePlaceholder(false)
-                                ->default(auth()->user()->id)
+                                ->default(user()?->id)
                                 ->label(trans('admin/server.owner'))
                                 ->columnSpan([
                                     'default' => 1,
@@ -151,7 +159,7 @@ class CreateServer extends CreateRecord
                                 ->relationship('user', 'username')
                                 ->searchable(['username', 'email'])
                                 ->getOptionLabelFromRecordUsing(fn (User $user) => "$user->username ($user->email)")
-                                ->createOptionAction(fn (Action $action) => $action->authorize(fn () => auth()->user()->can('create', User::class)))
+                                ->createOptionAction(fn (Action $action) => $action->authorize(fn () => user()?->can('create', User::class)))
                                 ->createOptionForm([
                                     TextInput::make('username')
                                         ->label(trans('admin/user.username'))
@@ -212,7 +220,7 @@ class CreateServer extends CreateRecord
                                         ->where('node_id', $get('node_id'))
                                         ->whereNull('server_id'),
                                 )
-                                ->createOptionAction(fn (Action $action) => $action->authorize(fn (Get $get) => auth()->user()->can('create', Node::find($get('node_id')))))
+                                ->createOptionAction(fn (Action $action) => $action->authorize(fn (Get $get) => user()?->can('create', Node::find($get('node_id')))))
                                 ->createOptionForm(function (Get $get) {
                                     $getPage = $get;
 
@@ -328,7 +336,7 @@ class CreateServer extends CreateRecord
                                 ->live()
                                 ->afterStateUpdated(function ($state, Set $set, Get $get, $old) {
                                     $egg = Egg::query()->find($state);
-                                    $set('startup', $egg->startup ?? '');
+                                    $set('startup', '');
                                     $set('image', '');
 
                                     $variables = $egg->variables ?? [];
@@ -402,24 +410,45 @@ class CreateServer extends CreateRecord
                                 ])
                                 ->inline(),
 
-                            Textarea::make('startup')
-                                ->hintIcon('tabler-code')
+                            Select::make('select_startup')
                                 ->label(trans('admin/server.startup_cmd'))
+                                ->hidden(fn (Get $get) => $get('egg_id') === null)
+                                ->live()
+                                ->afterStateUpdated(fn (Set $set, $state) => $set('startup', $state))
+                                ->options(function ($state, Get $get, Set $set) {
+                                    $egg = Egg::query()->find($get('egg_id'));
+                                    $startups = $egg->startup_commands ?? [];
+
+                                    $currentStartup = $get('startup');
+                                    if (!$currentStartup && $startups) {
+                                        $currentStartup = collect($startups)->first();
+                                        $set('startup', $currentStartup);
+                                        $set('select_startup', $currentStartup);
+                                    }
+
+                                    return array_flip($startups) + ['' => 'Custom Startup'];
+                                })
+                                ->selectablePlaceholder(false)
+                                ->columnSpanFull(),
+
+                            Textarea::make('startup')
+                                ->hiddenLabel()
                                 ->hidden(fn (Get $get) => $get('egg_id') === null)
                                 ->required()
                                 ->live()
-                                ->rows(function ($state) {
-                                    return str($state)->explode("\n")->reduce(
-                                        fn (int $carry, $line) => $carry + floor(strlen($line) / 125),
-                                        1
-                                    );
+                                ->autosize()
+                                ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                    $egg = Egg::query()->find($get('egg_id'));
+                                    $startups = $egg->startup_commands ?? [];
+
+                                    if (in_array($state, $startups)) {
+                                        $set('select_startup', $state);
+                                    } else {
+                                        $set('select_startup', '');
+                                    }
                                 })
-                                ->columnSpan([
-                                    'default' => 1,
-                                    'sm' => 4,
-                                    'md' => 4,
-                                    'lg' => 6,
-                                ]),
+                                ->placeholder(trans('admin/server.startup_placeholder'))
+                                ->columnSpanFull(),
 
                             Hidden::make('environment')->default([]),
 
@@ -497,12 +526,12 @@ class CreateServer extends CreateRecord
                                                 ->hidden(fn (Get $get) => $get('unlimited_cpu'))
                                                 ->label(trans('admin/server.cpu_limit'))->inlineLabel()
                                                 ->suffix('%')
+                                                ->hintIcon('tabler-question-mark', trans('admin/server.cpu_helper'))
                                                 ->default(0)
                                                 ->required()
                                                 ->columnSpan(2)
                                                 ->numeric()
-                                                ->minValue(0)
-                                                ->helperText(trans('admin/server.cpu_helper')),
+                                                ->minValue(0),
                                         ]),
                                     Grid::make()
                                         ->columns(4)
@@ -807,6 +836,8 @@ class CreateServer extends CreateRecord
         if ($allocation_additional = array_get($data, 'allocation_additional')) {
             $data['allocation_additional'] = collect($allocation_additional)->filter()->all();
         }
+
+        session()->put('last_utilized_node', $data['node_id']);
 
         try {
             return $this->serverCreationService->handle($data);

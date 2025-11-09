@@ -210,7 +210,7 @@ class EditServer extends EditRecord
                                     ->maxLength(255),
                                 Select::make('node_id')
                                     ->label(trans('admin/server.node'))
-                                    ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', auth()->user()->accessibleNodes()->pluck('id')))
+                                    ->relationship('node', 'name', fn (Builder $query) => $query->whereIn('id', user()?->accessibleNodes()->pluck('id')))
                                     ->columnSpan([
                                         'default' => 2,
                                         'sm' => 1,
@@ -258,6 +258,7 @@ class EditServer extends EditRecord
                                                     ->hidden(fn (Get $get) => $get('unlimited_cpu'))
                                                     ->label(trans('admin/server.cpu_limit'))->inlineLabel()
                                                     ->suffix('%')
+                                                    ->hintIcon('tabler-question-mark', trans('admin/server.cpu_helper'))
                                                     ->required()
                                                     ->columnSpan(2)
                                                     ->numeric()
@@ -609,26 +610,51 @@ class EditServer extends EditRecord
                                         1 => 'tabler-code-off',
                                     ])
                                     ->required(),
+
                                 Hidden::make('previewing')
                                     ->default(false),
-                                Textarea::make('startup')
+
+                                Select::make('select_startup')
                                     ->label(trans('admin/server.startup_cmd'))
-                                    ->required()
-                                    ->columnSpan(6)
-                                    ->autosize()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, $state) {
+                                        $set('startup', $state);
+                                        $set('previewing', false);
+                                    })
+                                    ->options(function ($state, Get $get, Set $set) {
+                                        $egg = Egg::find($get('egg_id'));
+                                        $startups = $egg->startup_commands ?? [];
+
+                                        $currentStartup = $get('startup');
+                                        if (!$currentStartup && $startups) {
+                                            $currentStartup = collect($startups)->first();
+                                            $set('startup', $currentStartup);
+                                            $set('select_startup', $currentStartup);
+                                        }
+
+                                        return array_flip($startups) + ['' => 'Custom Startup'];
+                                    })
+                                    ->selectablePlaceholder(false)
+                                    ->columnSpanFull()
                                     ->hintAction(PreviewStartupAction::make('preview')),
 
-                                Textarea::make('defaultStartup')
-                                    ->hintCopy()
-                                    ->label(trans('admin/server.default_startup'))
-                                    ->disabled()
+                                Textarea::make('startup')
+                                    ->hiddenLabel()
+                                    ->required()
+                                    ->live()
                                     ->autosize()
-                                    ->columnSpan(6)
-                                    ->formatStateUsing(function ($state, Get $get) {
-                                        $egg = Egg::query()->find($get('egg_id'));
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        $egg = Egg::find($get('egg_id'));
+                                        $startups = $egg->startup_commands ?? [];
 
-                                        return $egg->startup;
-                                    }),
+                                        if (in_array($state, $startups)) {
+                                            $set('select_startup', $state);
+                                        } else {
+                                            $set('select_startup', '');
+                                        }
+                                    })
+                                    ->placeholder(trans('admin/server.startup_placeholder'))
+                                    ->columnSpanFull(),
 
                                 Repeater::make('server_variables')
                                     ->hiddenLabel()
@@ -916,7 +942,7 @@ class EditServer extends EditRecord
                     }
                 })
                 ->hidden(fn () => $canForceDelete)
-                ->authorize(fn (Server $server) => auth()->user()->can('delete server', $server)),
+                ->authorize(fn (Server $server) => user()?->can('delete server', $server)),
             Action::make('ForceDelete')
                 ->color('danger')
                 ->label(trans('filament-actions::force-delete.single.label'))
@@ -933,7 +959,7 @@ class EditServer extends EditRecord
                     }
                 })
                 ->visible(fn () => $canForceDelete)
-                ->authorize(fn (Server $server) => auth()->user()->can('delete server', $server)),
+                ->authorize(fn (Server $server) => user()?->can('delete server', $server)),
             Action::make('console')
                 ->label(trans('admin/server.console'))
                 ->icon('tabler-terminal')

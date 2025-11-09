@@ -34,7 +34,6 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\StateCasts\BooleanStateCast;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
@@ -48,6 +47,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Socialite\Facades\Socialite;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * @method User getUser()
@@ -128,11 +128,10 @@ class EditProfile extends BaseEditProfile
                                     ->label(trans('profile.timezone'))
                                     ->required()
                                     ->prefixIcon('tabler-clock-pin')
-                                    ->default('UTC')
+                                    ->default(config('app.timezone', 'UTC'))
                                     ->selectablePlaceholder(false)
                                     ->options(fn () => collect(DateTimeZone::listIdentifiers())->mapWithKeys(fn ($tz) => [$tz => $tz]))
-                                    ->searchable()
-                                    ->native(false),
+                                    ->searchable(),
                                 Select::make('language')
                                     ->label(trans('profile.language'))
                                     ->required()
@@ -142,8 +141,7 @@ class EditProfile extends BaseEditProfile
                                     ->selectablePlaceholder(false)
                                     ->helperText(fn ($state, LanguageService $languageService) => new HtmlString($languageService->isLanguageTranslated($state) ? ''
                                             : trans('profile.language_help', ['state' => $state]) . ' <u><a href="https://crowdin.com/project/pelican-dev/">Update On Crowdin</a></u>'))
-                                    ->options(fn (LanguageService $languageService) => $languageService->getAvailableLanguages())
-                                    ->native(false),
+                                    ->options(fn (LanguageService $languageService) => $languageService->getAvailableLanguages()),
                                 FileUpload::make('avatar')
                                     ->visible(fn () => config('panel.filament.uploadable-avatars'))
                                     ->avatar()
@@ -151,14 +149,20 @@ class EditProfile extends BaseEditProfile
                                     ->directory('avatars')
                                     ->disk('public')
                                     ->getUploadedFileNameForStorageUsing(fn () => $this->getUser()->id . '.png')
-                                    ->hintAction(function (FileUpload $fileUpload) {
+                                    ->formatStateUsing(function (FileUpload $fileUpload) {
                                         $path = $fileUpload->getDirectory() . '/' . $this->getUser()->id . '.png';
+                                        if ($fileUpload->getDisk()->exists($path)) {
+                                            return $path;
+                                        }
+                                    })
+                                    ->deleteUploadedFileUsing(function (FileUpload $fileUpload, $file) {
+                                        if ($file instanceof TemporaryUploadedFile) {
+                                            return $file->delete();
+                                        }
 
-                                        return Action::make('remove_avatar')
-                                            ->icon('tabler-photo-minus')
-                                            ->iconButton()
-                                            ->hidden(fn () => !$fileUpload->getDisk()->exists($path))
-                                            ->action(fn () => $fileUpload->getDisk()->delete($path));
+                                        if ($fileUpload->getDisk()->exists($file)) {
+                                            return $fileUpload->getDisk()->delete($file);
+                                        }
                                     }),
                             ]),
                         Tab::make('oauth')
@@ -181,10 +185,10 @@ class EditProfile extends BaseEditProfile
                                         ->color(Color::hex($schema->getHexColor()))
                                         ->action(function (UserUpdateService $updateService) use ($id, $name, $unlink) {
                                             if ($unlink) {
-                                                $oauth = auth()->user()->oauth;
+                                                $oauth = user()?->oauth;
                                                 unset($oauth[$id]);
 
-                                                $updateService->handle(auth()->user(), ['oauth' => $oauth]);
+                                                $updateService->handle(user(), ['oauth' => $oauth]);
 
                                                 $this->fillForm();
 
@@ -229,7 +233,7 @@ class EditProfile extends BaseEditProfile
                                                     ->columnSpanFull(),
                                             ])
                                             ->headerActions([
-                                                Action::make('create')
+                                                Action::make('create_api_key')
                                                     ->label(trans('filament-actions::create.single.modal.actions.create.label'))
                                                     ->disabled(fn (Get $get) => empty($get('description')))
                                                     ->successRedirectUrl(self::getUrl(['tab' => 'api-keys::data::tab'], panel: 'app'))
@@ -292,7 +296,13 @@ class EditProfile extends BaseEditProfile
                                                         TextEntry::make('memo')
                                                             ->hiddenLabel()
                                                             ->state(fn (ApiKey $key) => $key->memo),
-                                                    ]),
+                                                    ])
+                                                    ->visible(fn (User $user) => $user->apiKeys()->exists()),
+
+                                                TextEntry::make('no_api_keys')
+                                                    ->state(trans('profile.no_api_keys'))
+                                                    ->hiddenLabel()
+                                                    ->visible(fn (User $user) => !$user->apiKeys()->exists()),
                                             ]),
                                     ]),
                             ]),
@@ -312,7 +322,7 @@ class EditProfile extends BaseEditProfile
                                                 ->live(),
                                         ])
                                         ->headerActions([
-                                            Action::make('create')
+                                            Action::make('create_ssh_key')
                                                 ->label(trans('filament-actions::create.single.modal.actions.create.label'))
                                                 ->disabled(fn (Get $get) => empty($get('name')) || empty($get('public_key')))
                                                 ->successRedirectUrl(self::getUrl(['tab' => 'ssh-keys::data::tab'], panel: 'app'))
@@ -381,7 +391,13 @@ class EditProfile extends BaseEditProfile
                                                     TextEntry::make('fingerprint')
                                                         ->hiddenLabel()
                                                         ->state(fn (UserSSHKey $key) => "SHA256:{$key->fingerprint}"),
-                                                ]),
+                                                ])
+                                                ->visible(fn (User $user) => $user->sshKeys()->exists()),
+
+                                            TextEntry::make('no_ssh_keys')
+                                                ->state(trans('profile.no_ssh_keys'))
+                                                ->hiddenLabel()
+                                                ->visible(fn (User $user) => !$user->sshKeys()->exists()),
                                         ]),
                                 ]),
                             ]),
@@ -423,10 +439,10 @@ class EditProfile extends BaseEditProfile
                                             ->label(trans('profile.navigation'))
                                             ->inline()
                                             ->options([
-                                                1 => trans('profile.top'),
-                                                0 => trans('profile.side'),
-                                            ])
-                                            ->stateCast(new BooleanStateCast(false, true)),
+                                                'sidebar' => trans('profile.sidebar'),
+                                                'topbar' => trans('profile.topbar'),
+                                                'mixed' => trans('profile.mixed'),
+                                            ]),
                                     ]),
                                 Section::make(trans('profile.console'))
                                     ->collapsible()
@@ -536,6 +552,7 @@ class EditProfile extends BaseEditProfile
     {
         return [
             $this->getSaveFormAction()->formId('form'),
+            $this->getCancelFormAction()->formId('form'),
         ];
 
     }
@@ -565,7 +582,14 @@ class EditProfile extends BaseEditProfile
         $data['console_rows'] = (int) $this->getUser()->getCustomization(CustomizationKey::ConsoleRows);
         $data['console_graph_period'] = (int) $this->getUser()->getCustomization(CustomizationKey::ConsoleGraphPeriod);
         $data['dashboard_layout'] = $this->getUser()->getCustomization(CustomizationKey::DashboardLayout);
-        $data['top_navigation'] = (bool) $this->getUser()->getCustomization(CustomizationKey::TopNavigation);
+
+        // Handle migration from boolean to string navigation types
+        $topNavigation = $this->getUser()->getCustomization(CustomizationKey::TopNavigation);
+        if (is_bool($topNavigation)) {
+            $data['top_navigation'] = $topNavigation ? 'topbar' : 'sidebar';
+        } else {
+            $data['top_navigation'] = $topNavigation;
+        }
 
         return $data;
     }

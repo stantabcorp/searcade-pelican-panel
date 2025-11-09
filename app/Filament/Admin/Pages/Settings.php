@@ -82,7 +82,7 @@ class Settings extends Page implements HasSchemas
 
     public static function canAccess(): bool
     {
-        return auth()->user()->can('view settings');
+        return user()?->can('view settings');
     }
 
     public function getTitle(): string
@@ -106,7 +106,7 @@ class Settings extends Page implements HasSchemas
             Tabs::make('Tabs')
                 ->columns()
                 ->persistTabInQueryString()
-                ->disabled(fn () => !auth()->user()->can('update settings'))
+                ->disabled(fn () => !user()?->can('update settings'))
                 ->tabs([
                     Tab::make('general')
                         ->label(trans('admin/setting.navigation.general'))
@@ -181,7 +181,6 @@ class Settings extends Page implements HasSchemas
                 ->schema([
                     Select::make('FILAMENT_AVATAR_PROVIDER')
                         ->label(trans('admin/setting.general.avatar_provider'))
-                        ->native(false)
                         ->options($this->avatarService->getMappings())
                         ->selectablePlaceholder(false)
                         ->default(env('FILAMENT_AVATAR_PROVIDER', config('panel.filament.avatar-provider'))),
@@ -204,6 +203,15 @@ class Settings extends Page implements HasSchemas
                 ])
                 ->stateCast(new BooleanStateCast(false, true))
                 ->default(env('PANEL_USE_BINARY_PREFIX', config('panel.use_binary_prefix'))),
+            ToggleButtons::make('FILAMENT_DEFAULT_NAVIGATION')
+                ->label(trans('admin/setting.general.default_navigation'))
+                ->inline()
+                ->options([
+                    'sidebar' => trans('admin/setting.general.sidebar'),
+                    'topbar' => trans('admin/setting.general.topbar'),
+                    'mixed' => trans('admin/setting.general.mixed'),
+                ])
+                ->default(env('FILAMENT_DEFAULT_NAVIGATION', config('panel.filament.default-navigation'))),
             ToggleButtons::make('APP_2FA_REQUIRED')
                 ->label(trans('admin/setting.general.2fa_requirement'))
                 ->inline()
@@ -217,7 +225,6 @@ class Settings extends Page implements HasSchemas
                 ->default(env('APP_2FA_REQUIRED', config('panel.auth.2fa_required'))),
             Select::make('FILAMENT_WIDTH')
                 ->label(trans('admin/setting.general.display_width'))
-                ->native(false)
                 ->options(Width::class)
                 ->selectablePlaceholder(false)
                 ->default(env('FILAMENT_WIDTH', config('panel.filament.display-width'))),
@@ -233,12 +240,12 @@ class Settings extends Page implements HasSchemas
                         ->color('danger')
                         ->icon('tabler-trash')
                         ->requiresConfirmation()
-                        ->authorize(fn () => auth()->user()->can('update settings'))
+                        ->authorize(fn () => user()?->can('update settings'))
                         ->action(fn (Set $set) => $set('TRUSTED_PROXIES', [])),
                     Action::make('cloudflare')
                         ->label(trans('admin/setting.general.set_to_cf'))
                         ->icon('tabler-brand-cloudflare')
-                        ->authorize(fn () => auth()->user()->can('update settings'))
+                        ->authorize(fn () => user()?->can('update settings'))
                         ->action(function (Factory $client, Set $set) {
                             $ips = collect();
 
@@ -335,7 +342,7 @@ class Settings extends Page implements HasSchemas
                         ->label(trans('admin/setting.mail.test_mail'))
                         ->icon('tabler-send')
                         ->hidden(fn (Get $get) => $get('MAIL_MAILER') === 'log')
-                        ->authorize(fn () => auth()->user()->can('update settings'))
+                        ->authorize(fn () => user()?->can('update settings'))
                         ->action(function (Get $get) {
                             // Store original mail configuration
                             $originalConfig = [
@@ -368,8 +375,8 @@ class Settings extends Page implements HasSchemas
                                     'services.mailgun.endpoint' => $get('MAILGUN_ENDPOINT'),
                                 ]);
 
-                                MailNotification::route('mail', auth()->user()->email)
-                                    ->notify(new MailTested(auth()->user()));
+                                MailNotification::route('mail', user()?->email)
+                                    ->notify(new MailTested(user()));
 
                                 Notification::make()
                                     ->title(trans('admin/setting.mail.test_mail_sent'))
@@ -822,7 +829,7 @@ class Settings extends Page implements HasSchemas
         return [
             Action::make('save')
                 ->action('save')
-                ->authorize(fn () => auth()->user()->can('update settings'))
+                ->authorize(fn () => user()?->can('update settings'))
                 ->keyBindings(['mod+s']),
         ];
 

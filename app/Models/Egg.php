@@ -21,9 +21,9 @@ use Illuminate\Support\Str;
  * @property string $author
  * @property string $name
  * @property string|null $description
+ * @property string|null $image
  * @property string[]|null $features
- * @property string $docker_image -- deprecated, use $docker_images
- * @property array<array-key, string> $docker_images
+ * @property array<string, string> $docker_images
  * @property string|null $update_url
  * @property bool $force_outgoing_ip
  * @property string[]|null $file_denylist
@@ -32,7 +32,7 @@ use Illuminate\Support\Str;
  * @property string|null $config_logs
  * @property string|null $config_stop
  * @property int|null $config_from
- * @property string|null $startup
+ * @property array<string, string> $startup_commands
  * @property bool $script_is_privileged
  * @property string|null $script_install
  * @property string $script_entry
@@ -71,7 +71,7 @@ class Egg extends Model implements Validatable
     /**
      * Defines the current egg export version.
      */
-    public const EXPORT_VERSION = 'PLCN_v2';
+    public const EXPORT_VERSION = 'PLCN_v3';
 
     /**
      * Fields that are not mass assignable.
@@ -81,6 +81,7 @@ class Egg extends Model implements Validatable
         'name',
         'author',
         'description',
+        'image',
         'features',
         'docker_images',
         'force_outgoing_ip',
@@ -90,7 +91,7 @@ class Egg extends Model implements Validatable
         'config_logs',
         'config_stop',
         'config_from',
-        'startup',
+        'startup_commands',
         'update_url',
         'script_is_privileged',
         'script_install',
@@ -105,13 +106,15 @@ class Egg extends Model implements Validatable
         'uuid' => ['required', 'string', 'size:36'],
         'name' => ['required', 'string', 'max:255'],
         'description' => ['string', 'nullable'],
+        'image' => ['string', 'nullable'],
         'features' => ['array', 'nullable'],
         'author' => ['required', 'string', 'email'],
         'file_denylist' => ['array', 'nullable'],
         'file_denylist.*' => ['string'],
         'docker_images' => ['required', 'array', 'min:1'],
         'docker_images.*' => ['required', 'string'],
-        'startup' => ['required', 'nullable', 'string'],
+        'startup_commands' => ['required', 'array', 'min:1'],
+        'startup_commands.*' => ['required', 'string', 'distinct'],
         'config_from' => ['sometimes', 'bail', 'nullable', 'numeric', 'exists:eggs,id'],
         'config_stop' => ['required_without:config_from', 'nullable', 'string', 'max:255'],
         'config_startup' => ['required_without:config_from', 'nullable', 'json'],
@@ -143,6 +146,7 @@ class Egg extends Model implements Validatable
             'features' => 'array',
             'docker_images' => 'array',
             'file_denylist' => 'array',
+            'startup_commands' => 'array',
             'tags' => 'array',
         ];
     }

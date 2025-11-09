@@ -7,11 +7,13 @@ use App\Exceptions\Repository\FileNotEditableException;
 use App\Facades\Activity;
 use App\Filament\Server\Resources\Files\FileResource;
 use App\Livewire\AlertBanner;
+use App\Models\File;
 use App\Models\Permission;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CodeEditor;
@@ -81,7 +83,7 @@ class EditFiles extends Page
                     ->footerActions([
                         Action::make('save_and_close')
                             ->label(trans('server/file.actions.edit.save_close'))
-                            ->authorize(fn () => auth()->user()->can(Permission::ACTION_FILE_UPDATE, $server))
+                            ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
                             ->icon('tabler-device-floppy')
                             ->keyBindings('mod+shift+s')
                             ->action(function () {
@@ -101,7 +103,7 @@ class EditFiles extends Page
                             }),
                         Action::make('save')
                             ->label(trans('server/file.actions.edit.save'))
-                            ->authorize(fn () => auth()->user()->can(Permission::ACTION_FILE_UPDATE, $server))
+                            ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
                             ->icon('tabler-device-floppy')
                             ->keyBindings('mod+s')
                             ->action(function () {
@@ -215,19 +217,21 @@ class EditFiles extends Page
 
         $this->previousUrl = url()->previous();
 
-        if (str($path)->endsWith('.pelicanignore')) {
-            AlertBanner::make('.pelicanignore_info')
-                ->title(trans('server/file.alerts.pelicanignore.title'))
-                ->body(trans('server/file.alerts.pelicanignore.body'))
-                ->info()
-                ->closable()
-                ->send();
+        foreach (File::getSpecialFiles() as $fileName => $data) {
+            if ($data['check'] instanceof Closure && $data['check']($path)) {
+                AlertBanner::make($fileName . '_info')
+                    ->title($data['title'])
+                    ->body($data['body'])
+                    ->info()
+                    ->closable()
+                    ->send();
+            }
         }
     }
 
     protected function authorizeAccess(): void
     {
-        abort_unless(auth()->user()->can(Permission::ACTION_FILE_READ_CONTENT, Filament::getTenant()), 403);
+        abort_unless(user()?->can(Permission::ACTION_FILE_READ_CONTENT, Filament::getTenant()), 403);
     }
 
     /**

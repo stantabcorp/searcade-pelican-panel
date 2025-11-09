@@ -1,9 +1,9 @@
 <x-filament::widget>
     @assets
     @php
-        $userFont = (string) auth()->user()->getCustomization(\App\Enums\CustomizationKey::ConsoleFont);
-        $userFontSize = (int) auth()->user()->getCustomization(\App\Enums\CustomizationKey::ConsoleFontSize);
-        $userRows = (int) auth()->user()->getCustomization(\App\Enums\CustomizationKey::ConsoleRows);
+        $userFont = (string) user()?->getCustomization(\App\Enums\CustomizationKey::ConsoleFont);
+        $userFontSize = (int) user()?->getCustomization(\App\Enums\CustomizationKey::ConsoleFontSize);
+        $userRows = (int) user()?->getCustomization(\App\Enums\CustomizationKey::ConsoleRows);
     @endphp
     @if($userFont !== "monospace")
         <link rel="preload" href="{{ asset("storage/fonts/{$userFont}.ttf") }}" as="font" crossorigin>
@@ -76,19 +76,19 @@
             theme: theme
         };
 
-        const { Terminal, FitAddon, WebLinksAddon, SearchAddon, SearchBarAddon, CanvasAddon } = window.Xterm;
+        const { Terminal, FitAddon, WebLinksAddon, SearchAddon, SearchBarAddon, WebglAddon } = window.Xterm;
 
         const terminal = new Terminal(options);
         const fitAddon = new FitAddon();
         const webLinksAddon = new WebLinksAddon();
         const searchAddon = new SearchAddon();
         const searchAddonBar = new SearchBarAddon({ searchAddon });
-        const canvasAddon = new CanvasAddon();
+        const webglAddon = new WebglAddon();
         terminal.loadAddon(fitAddon);
         terminal.loadAddon(webLinksAddon);
         terminal.loadAddon(searchAddon);
         terminal.loadAddon(searchAddonBar);
-        terminal.loadAddon(canvasAddon);
+        terminal.loadAddon(webglAddon);
 
         terminal.open(document.getElementById('terminal'));
 

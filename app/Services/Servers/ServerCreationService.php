@@ -61,8 +61,8 @@ class ServerCreationService
         $egg = Egg::query()->findOrFail($data['egg_id']);
 
         // Fill missing fields from egg
-        $data['image'] ??= collect($egg->docker_images)->first();
-        $data['startup'] ??= $egg->startup;
+        $data['image'] ??= Arr::first($egg->docker_images);
+        $data['startup'] ??= Arr::first($egg->startup_commands);
 
         // If a deployment object has been passed we need to get the allocation and node that the server should use.
         if ($deployment) {
@@ -191,6 +191,7 @@ class ServerCreationService
             ->get()
             ->each(function (Allocation $allocation) use ($server) {
                 $allocation->server_id = $server->id;
+                $allocation->is_locked = true;
                 $allocation->save();
             });
     }

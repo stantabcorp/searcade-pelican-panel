@@ -21,6 +21,7 @@ return [
     ],
     'user' => [
         'account' => [
+            'username-changed' => 'Changed username from <b>:old</b> to <b>:new</b>',
             'email-changed' => 'Changed email from <b>:old</b> to <b>:new</b>',
             'password-changed' => 'Changed password',
         ],
@@ -112,6 +113,7 @@ return [
         'startup' => [
             'edit' => 'Changed the <b>:variable</b> variable from "<b>:old</b>" to "<b>:new</b>"',
             'image' => 'Updated the Docker Image for the server from <b>:old</b> to <b>:new</b>',
+            'command' => 'Updated the Startup Command for the server from <b>:old</b> to <b>:new</b>',
         ],
         'subuser' => [
             'create' => 'Added <b>:email</b> as a subuser',
