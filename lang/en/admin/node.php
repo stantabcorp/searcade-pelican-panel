@@ -14,6 +14,7 @@ return [
     ],
     'table' => [
         'health' => 'Health',
+        'reachable' => 'Reachable',
         'name' => 'Name',
         'address' => 'Address',
         'public' => 'Public',
@@ -39,6 +40,7 @@ return [
     'ip_help' => 'Usually your machine\'s public IP unless you are port forwarding.',
     'alias_help' => 'Optional display name to help you remember what these are.',
     'refresh' => 'Refresh',
+    'custom_ip' => 'Enter Custom IP',
     'domain' => 'Domain Name',
     'ssl_ip' => 'You cannot connect to an IP Address over SSL',
     'error' => 'This is the domain name that points to your node\'s IP Address. If you\'ve already set up this, you can verify it by checking the next field!',
@@ -61,13 +63,12 @@ return [
 
     'tags' => 'Tags',
     'upload_limit' => 'Upload Limit',
-    'upload_limit_help' => [
-        'Enter the maximum size of files that can be uploaded through the web-based file manager.',
-        'Make sure your webserver supports file uploads of this size!',
-    ],
+    'upload_limit_help' => 'Enter the maximum size of files that can be uploaded through the web-based file manager.',
     'sftp_port' => 'SFTP Port',
     'sftp_alias' => 'SFTP Alias',
     'sftp_alias_help' => 'Display alias for the SFTP address. Leave empty to use the Node FQDN.',
+    'daemon_base' => 'Daemon Base Directory',
+    'daemon_base_help' => 'The directory where server data will be stored.',
     'use_for_deploy' => 'Use for Deployments?',
     'maintenance_mode' => 'Maintenance Mode',
     'maintenance_mode_help' => 'If the node is marked \'Under Maintenance\' users won\'t be able to access servers that are on that node',
@@ -107,7 +108,6 @@ return [
     'used' => 'Used',
     'unused' => 'Unused',
 
-    'next_step' => 'Next Step',
     'node_has_servers' => 'Node Has Servers',
     'create_allocation' => 'Create Allocation',
     'primary_allocation' => 'Primary Allocation',

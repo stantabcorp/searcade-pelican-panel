@@ -2,13 +2,16 @@
 
 namespace App\Filament\Server\Resources\Files\Pages;
 
+use App\Enums\EditorLanguages;
+use App\Enums\SubuserPermission;
+use App\Enums\TablerIcon;
 use App\Exceptions\Http\Server\FileSizeTooLargeException;
 use App\Exceptions\Repository\FileNotEditableException;
 use App\Facades\Activity;
+use App\Filament\Components\Forms\Fields\MonacoEditor;
 use App\Filament\Server\Resources\Files\FileResource;
 use App\Livewire\AlertBanner;
 use App\Models\File;
-use App\Models\Permission;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use App\Traits\Filament\CanCustomizeHeaderActions;
@@ -16,8 +19,6 @@ use App\Traits\Filament\CanCustomizeHeaderWidgets;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CodeEditor;
-use Filament\Forms\Components\CodeEditor\Enums\Language;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -81,10 +82,10 @@ class EditFiles extends Page
             ->components([
                 Section::make(trans('server/file.actions.edit.title', ['file' => $this->path]))
                     ->footerActions([
-                        Action::make('save_and_close')
+                        Action::make('fm_save_and_close')
                             ->label(trans('server/file.actions.edit.save_close'))
-                            ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
-                            ->icon('tabler-device-floppy')
+                            ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
+                            ->icon(TablerIcon::DeviceFloppy)
                             ->keyBindings('mod+shift+s')
                             ->action(function () {
                                 $this->getDaemonFileRepository()->putContent($this->path, $this->data['editor'] ?? '');
@@ -101,10 +102,10 @@ class EditFiles extends Page
 
                                 $this->redirectToList();
                             }),
-                        Action::make('save')
+                        Action::make('fm_save')
                             ->label(trans('server/file.actions.edit.save'))
-                            ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
-                            ->icon('tabler-device-floppy')
+                            ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
+                            ->icon(TablerIcon::DeviceFloppy)
                             ->keyBindings('mod+s')
                             ->action(function () {
                                 $this->getDaemonFileRepository()->putContent($this->path, $this->data['editor'] ?? '');
@@ -119,10 +120,10 @@ class EditFiles extends Page
                                     ->body(fn () => $this->path)
                                     ->send();
                             }),
-                        Action::make('cancel')
+                        Action::make('fm_cancel')
                             ->label(trans('server/file.actions.edit.cancel'))
                             ->color('danger')
-                            ->icon('tabler-x')
+                            ->icon(TablerIcon::X)
                             ->alpineClickHandler(function () {
                                 $url = $this->previousUrl ?? ListFiles::getUrl(['path' => dirname($this->path)]);
 
@@ -137,41 +138,18 @@ class EditFiles extends Page
                             ->label(trans('server/file.actions.new_file.syntax'))
                             ->searchable()
                             ->live()
-                            ->options(Language::class)
+                            ->options(EditorLanguages::class)
                             ->selectablePlaceholder(false)
-                            ->default(fn () => match (pathinfo($this->path, PATHINFO_EXTENSION)) {
-                                'cc', 'hpp' => Language::Cpp,
-
-                                'css', 'scss' => Language::Css,
-
-                                'go' => Language::Go,
-
-                                'html' => Language::Html,
-
-                                'class', 'kt', 'kts' => Language::Java,
-
-                                'js', 'mjs', 'cjs', 'ts', 'tsx' => Language::JavaScript,
-
-                                'json', 'json5' => Language::Json,
-
-                                'md' => Language::Markdown,
-
-                                'php3', 'php4', 'php5', 'phtml', 'php' => Language::Php,
-
-                                'py', 'pyc', 'pyo', 'pyi' => Language::Python,
-
-                                'xml' => Language::Xml,
-
-                                'yml', 'yaml' => Language::Yaml,
-
-                                default => null,
-                            }),
-                        CodeEditor::make('editor')
+                            ->afterStateUpdated(fn ($state) => $this->dispatch('setLanguage', lang: $state))
+                            ->default(fn () => EditorLanguages::fromWithAlias(pathinfo($this->path, PATHINFO_EXTENSION))),
+                        MonacoEditor::make('editor')
                             ->hiddenLabel()
                             ->language(fn (Get $get) => $get('lang'))
                             ->default(function () {
                                 try {
-                                    return $this->getDaemonFileRepository()->getContent($this->path, config('panel.files.max_edit_size'));
+                                    $contents = $this->getDaemonFileRepository()->getContent($this->path, config('panel.files.max_edit_size'));
+
+                                    return mb_convert_encoding($contents, 'UTF-8', ['UTF-8', 'UTF-16', 'ISO-8859-1', 'ASCII']);
                                 } catch (FileSizeTooLargeException) {
                                     AlertBanner::make('file_too_large')
                                         ->title(trans('server/file.alerts.file_too_large.title', ['name' => basename($this->path)]))
@@ -194,6 +172,7 @@ class EditFiles extends Page
                                 } catch (ConnectionException) {
                                     // Alert banner for this one will be handled by ListFiles
                                 }
+
                                 $this->redirectToList();
                             }),
                     ])
@@ -231,7 +210,7 @@ class EditFiles extends Page
 
     protected function authorizeAccess(): void
     {
-        abort_unless(user()?->can(Permission::ACTION_FILE_READ_CONTENT, Filament::getTenant()), 403);
+        abort_unless(user()?->can(SubuserPermission::FileReadContent, Filament::getTenant()), 403);
     }
 
     /**
@@ -265,7 +244,7 @@ class EditFiles extends Page
         $previousParts = '';
         foreach (explode('/', $this->path) as $part) {
             $previousParts = $previousParts . '/' . $part;
-            $breadcrumbs[self::getUrl(['path' => ltrim($previousParts, '/')])] = $part;
+            $breadcrumbs[ListFiles::getUrl(['path' => ltrim($previousParts, '/')])] = $part;
         }
 
         return $breadcrumbs;

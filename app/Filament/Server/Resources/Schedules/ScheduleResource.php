@@ -3,6 +3,7 @@
 namespace App\Filament\Server\Resources\Schedules;
 
 use App\Enums\ScheduleStatus;
+use App\Enums\TablerIcon;
 use App\Facades\Activity;
 use App\Filament\Components\Actions\ImportScheduleAction;
 use App\Filament\Components\Forms\Actions\CronPresetAction;
@@ -13,20 +14,19 @@ use App\Filament\Server\Resources\Schedules\Pages\ListSchedules;
 use App\Filament\Server\Resources\Schedules\Pages\ViewSchedule;
 use App\Filament\Server\Resources\Schedules\RelationManagers\TasksRelationManager;
 use App\Helpers\Utilities;
-use App\Models\Permission;
 use App\Models\Schedule;
 use App\Traits\Filament\BlockAccessInConflict;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
 use App\Traits\Filament\CanModifyForm;
 use App\Traits\Filament\CanModifyTable;
+use BackedEnum;
 use Carbon\Carbon;
 use Exception;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -41,12 +41,10 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\IconSize;
 use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Throwable;
 
@@ -62,27 +60,7 @@ class ScheduleResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-clock';
-
-    public static function canViewAny(): bool
-    {
-        return user()?->can(Permission::ACTION_SCHEDULE_READ, Filament::getTenant());
-    }
-
-    public static function canCreate(): bool
-    {
-        return user()?->can(Permission::ACTION_SCHEDULE_CREATE, Filament::getTenant());
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return user()?->can(Permission::ACTION_SCHEDULE_UPDATE, Filament::getTenant());
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return user()?->can(Permission::ACTION_SCHEDULE_DELETE, Filament::getTenant());
-    }
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::Clock;
 
     /**
      * @throws Exception
@@ -103,13 +81,13 @@ class ScheduleResource extends Resource
                     ->required(),
                 Toggle::make('only_when_online')
                     ->label(trans('server/schedule.only_online'))
-                    ->hintIcon('tabler-question-mark', trans('server/schedule.only_online_hint'))
+                    ->hintIcon(TablerIcon::QuestionMark, trans('server/schedule.only_online_hint'))
                     ->inline(false)
                     ->required()
                     ->default(1),
                 Toggle::make('is_active')
                     ->label(trans('server/schedule.enabled'))
-                    ->hintIcon('tabler-question-mark', trans('server/schedule.enabled_hint'))
+                    ->hintIcon(TablerIcon::QuestionMark, trans('server/schedule.enabled_hint'))
                     ->inline(false)
                     ->hiddenOn('view')
                     ->required()
@@ -119,8 +97,7 @@ class ScheduleResource extends Resource
                     ->formatStateUsing(fn (?Schedule $schedule) => $schedule?->status->value ?? 'new')
                     ->options(fn (?Schedule $schedule) => [$schedule?->status->value ?? 'new' => $schedule?->status->getLabel() ?? 'New'])
                     ->visibleOn('view'),
-                Section::make('Cron')
-                    ->label(trans('server/schedule.cron'))
+                Section::make(trans('server/schedule.cron'))
                     ->description(function (Get $get) {
                         try {
                             $nextRun = Utilities::getScheduleNextRunDate($get('cron_minute'), $get('cron_hour'), $get('cron_day_of_month'), $get('cron_month'), $get('cron_day_of_week'))->timezone(user()->timezone ?? 'UTC');
@@ -132,22 +109,22 @@ class ScheduleResource extends Resource
                     })
                     ->schema([
                         Actions::make([
-                            CronPresetAction::make('hourly')
+                            CronPresetAction::make('exclude_hourly')
                                 ->label(trans('server/schedule.time.hourly'))
                                 ->cron('0', '*', '*', '*', '*'),
-                            CronPresetAction::make('daily')
+                            CronPresetAction::make('exclude_daily')
                                 ->label(trans('server/schedule.time.daily'))
                                 ->cron('0', '0', '*', '*', '*'),
-                            CronPresetAction::make('weekly_monday')
+                            CronPresetAction::make('exclude_weekly_monday')
                                 ->label(trans('server/schedule.time.weekly_mon'))
                                 ->cron('0', '0', '*', '*', '1'),
-                            CronPresetAction::make('weekly_sunday')
+                            CronPresetAction::make('exclude_weekly_sunday')
                                 ->label(trans('server/schedule.time.weekly_sun'))
                                 ->cron('0', '0', '*', '*', '0'),
-                            CronPresetAction::make('monthly')
+                            CronPresetAction::make('exclude_monthly')
                                 ->label(trans('server/schedule.time.monthly'))
                                 ->cron('0', '0', '1', '*', '*'),
-                            CronPresetAction::make('every_x_minutes')
+                            CronPresetAction::make('exclude_every_x_minutes')
                                 ->label(trans('server/schedule.time.every_min'))
                                 ->color(fn (Get $get) => str($get('cron_minute'))->startsWith('*/')
                                                     && $get('cron_hour') == '*'
@@ -170,7 +147,7 @@ class ScheduleResource extends Resource
                                     $set('cron_month', '*');
                                     $set('cron_day_of_week', '*');
                                 }),
-                            CronPresetAction::make('every_x_hours')
+                            CronPresetAction::make('exclude_every_x_hours')
                                 ->color(fn (Get $get) => $get('cron_minute') == '0'
                                                     && str($get('cron_hour'))->startsWith('*/')
                                                     && $get('cron_day_of_month') == '*'
@@ -192,7 +169,7 @@ class ScheduleResource extends Resource
                                     $set('cron_month', '*');
                                     $set('cron_day_of_week', '*');
                                 }),
-                            CronPresetAction::make('every_x_days')
+                            CronPresetAction::make('exclude_every_x_days')
                                 ->color(fn (Get $get) => $get('cron_minute') == '0'
                                                     && $get('cron_hour') == '0'
                                                     && str($get('cron_day_of_month'))->startsWith('*/')
@@ -214,7 +191,7 @@ class ScheduleResource extends Resource
                                     $set('cron_month', '*');
                                     $set('cron_day_of_week', '*');
                                 }),
-                            CronPresetAction::make('every_x_months')
+                            CronPresetAction::make('exclude_every_x_months')
                                 ->color(fn (Get $get) => $get('cron_minute') == '0'
                                                     && $get('cron_hour') == '0'
                                                     && $get('cron_day_of_month') == '1'
@@ -236,7 +213,7 @@ class ScheduleResource extends Resource
                                     $set('cron_month', '*/' . $data['x']);
                                     $set('cron_day_of_week', '*');
                                 }),
-                            CronPresetAction::make('every_x_day_of_week')
+                            CronPresetAction::make('exclude_every_x_day_of_week')
                                 ->color(fn (Get $get) => $get('cron_minute') == '0'
                                                     && $get('cron_hour') == '0'
                                                     && $get('cron_day_of_month') == '*'
@@ -357,7 +334,8 @@ class ScheduleResource extends Resource
                     ->state(fn (Schedule $schedule) => $schedule->status === ScheduleStatus::Active ? $schedule->next_run_at : null),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->hidden(fn ($record) => static::getEditAuthorizationResponse($record)->allowed()),
                 EditAction::make(),
                 DeleteAction::make()
                     ->after(function (Schedule $schedule) {
@@ -369,13 +347,13 @@ class ScheduleResource extends Resource
             ])
             ->toolbarActions([
                 CreateAction::make()
-                    ->hiddenLabel()->iconButton()->iconSize(IconSize::ExtraLarge)
-                    ->icon('tabler-calendar-plus')
+                    ->hiddenLabel()
+                    ->icon(TablerIcon::CalendarPlus)
                     ->color('primary')
                     ->tooltip(trans('server/schedule.new')),
                 ImportScheduleAction::make()
-                    ->hiddenLabel()->iconButton()->iconSize(IconSize::ExtraLarge)
-                    ->icon('tabler-file-import')
+                    ->hiddenLabel()
+                    ->icon(TablerIcon::FileImport)
                     ->color('success')
                     ->tooltip(trans('server/schedule.import')),
             ]);

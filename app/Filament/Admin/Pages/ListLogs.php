@@ -2,16 +2,17 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\TablerIcon;
 use Boquizo\FilamentLogViewer\Actions\DeleteAction;
 use Boquizo\FilamentLogViewer\Actions\DownloadAction;
 use Boquizo\FilamentLogViewer\Actions\ViewLogAction;
 use Boquizo\FilamentLogViewer\Pages\ListLogs as BaseListLogs;
 use Boquizo\FilamentLogViewer\Tables\Columns\LevelColumn;
 use Boquizo\FilamentLogViewer\Tables\Columns\NameColumn;
+use Boquizo\FilamentLogViewer\UseCases\ParseDateUseCase;
 use Boquizo\FilamentLogViewer\Utils\Level;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\IconSize;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Http;
 
@@ -28,7 +29,7 @@ class ListLogs extends BaseListLogs
     {
         return parent::table($table)
             ->emptyStateHeading(trans('admin/log.empty_table'))
-            ->emptyStateIcon('tabler-check')
+            ->emptyStateIcon(TablerIcon::Check)
             ->columns([
                 NameColumn::make('date'),
                 LevelColumn::make(Level::ALL)
@@ -46,18 +47,21 @@ class ListLogs extends BaseListLogs
             ])
             ->recordActions([
                 ViewLogAction::make()
-                    ->icon('tabler-file-description')->iconSize(IconSize::Medium),
+                    ->icon(TablerIcon::FileDescription)->iconButton(),
                 DownloadAction::make()
-                    ->icon('tabler-file-download')->iconSize(IconSize::Medium),
+                    ->tooltip(fn ($record) => trans('filament-log-viewer::log.table.actions.download.label', ['log' => ParseDateUseCase::execute($record['date'])]))
+                    ->icon(TablerIcon::FileDownload)->iconButton(),
                 Action::make('uploadLogs')
-                    ->button()
                     ->hiddenLabel()
-                    ->icon('tabler-world-upload')->iconSize(IconSize::Medium)
+                    ->tooltip(trans('admin/log.actions.upload_tooltip', ['url' => 'logs.pelican.dev']))
+                    ->icon(TablerIcon::WorldUpload)
                     ->requiresConfirmation()
                     ->modalHeading(trans('admin/log.actions.upload_logs'))
                     ->modalDescription(fn ($record) => trans('admin/log.actions.upload_logs_description', ['file' => $record['date'], 'url' => 'https://logs.pelican.dev']))
                     ->action(function ($record) {
-                        $logPath = storage_path('logs/' . $record['date']);
+                        $prefix = config('filament-log-viewer.pattern.prefix', 'laravel-');
+                        $extension = config('filament-log-viewer.pattern.extension', '.log');
+                        $logPath = storage_path('logs/' . $prefix . $record['date'] . $extension);
 
                         if (!file_exists($logPath)) {
                             Notification::make()
@@ -74,18 +78,12 @@ class ListLogs extends BaseListLogs
                         $uploadLines = $totalLines <= 1000 ? $lines : array_slice($lines, -1000);
                         $content = implode("\n", $uploadLines);
 
-                        $logUrl = 'https://logs.pelican.dev';
                         try {
-                            $response = Http::timeout(10)->asMultipart()->post($logUrl, [
-                                [
-                                    'name' => 'c',
-                                    'contents' => $content,
-                                ],
-                                [
-                                    'name' => 'e',
-                                    'contents' => '14d',
-                                ],
-                            ]);
+                            $response = Http::timeout(10)
+                                ->asMultipart()
+                                ->attach('c', $content)
+                                ->attach('e', '14d')
+                                ->post('https://logs.pelican.dev');
 
                             if ($response->failed()) {
                                 Notification::make()
@@ -105,7 +103,7 @@ class ListLogs extends BaseListLogs
                                 ->body("{$url}")
                                 ->success()
                                 ->actions([
-                                    Action::make('viewLogs')
+                                    Action::make('exclude_viewLogs')
                                         ->label(trans('admin/log.actions.view_logs'))
                                         ->url($url)
                                         ->openUrlInNewTab(true),
@@ -124,7 +122,7 @@ class ListLogs extends BaseListLogs
                         }
                     }),
                 DeleteAction::make()
-                    ->icon('tabler-trash')->iconSize(IconSize::Medium),
+                    ->icon(TablerIcon::Trash)->iconButton(),
             ]);
     }
 }

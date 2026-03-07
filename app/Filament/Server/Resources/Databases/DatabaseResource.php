@@ -2,12 +2,13 @@
 
 namespace App\Filament\Server\Resources\Databases;
 
+use App\Enums\SubuserPermission;
+use App\Enums\TablerIcon;
 use App\Filament\Components\Actions\RotateDatabasePasswordAction;
 use App\Filament\Components\Tables\Columns\DateTimeColumn;
 use App\Filament\Server\Resources\Databases\Pages\ListDatabases;
 use App\Models\Database;
 use App\Models\DatabaseHost;
-use App\Models\Permission;
 use App\Models\Server;
 use App\Services\Databases\DatabaseManagementService;
 use App\Traits\Filament\BlockAccessInConflict;
@@ -16,6 +17,7 @@ use App\Traits\Filament\CanCustomizeRelations;
 use App\Traits\Filament\CanModifyForm;
 use App\Traits\Filament\CanModifyTable;
 use App\Traits\Filament\HasLimitBadge;
+use BackedEnum;
 use Exception;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -28,10 +30,8 @@ use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\IconSize;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class DatabaseResource extends Resource
@@ -47,7 +47,7 @@ class DatabaseResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-database';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::Database;
 
     protected static function getBadgeCount(): int
     {
@@ -62,7 +62,7 @@ class DatabaseResource extends Resource
         /** @var Server $server */
         $server = Filament::getTenant();
 
-        return $server->database_limit;
+        return $server->database_limit ?? 0;
     }
 
     /**
@@ -88,10 +88,10 @@ class DatabaseResource extends Resource
                 TextInput::make('password')
                     ->label(trans('server/database.password'))
                     ->password()->revealable()
-                    ->hidden(fn () => !user()?->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
+                    ->hidden(fn () => !user()?->can(SubuserPermission::DatabaseViewPassword, $server))
                     ->hintAction(
                         RotateDatabasePasswordAction::make()
-                            ->authorize(fn () => user()?->can(Permission::ACTION_DATABASE_UPDATE, $server))
+                            ->authorize(fn () => user()?->can(SubuserPermission::DatabaseUpdate, $server))
                     )
                     ->copyable()
                     ->formatStateUsing(fn (Database $database) => $database->password),
@@ -99,11 +99,11 @@ class DatabaseResource extends Resource
                     ->label(trans('server/database.remote')),
                 TextInput::make('max_connections')
                     ->label(trans('server/database.max_connections'))
-                    ->formatStateUsing(fn (Database $database) => $database->max_connections === 0 ? $database->max_connections : 'Unlimited'),
+                    ->formatStateUsing(fn (Database $database) => $database->max_connections ?: trans('server/database.unlimited')),
                 TextInput::make('jdbc')
                     ->label(trans('server/database.jdbc'))
                     ->password()->revealable()
-                    ->hidden(!user()?->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
+                    ->hidden(!user()?->can(SubuserPermission::DatabaseViewPassword, $server))
                     ->copyable()
                     ->columnSpanFull()
                     ->formatStateUsing(fn (Database $database) => $database->jdbc),
@@ -159,8 +159,8 @@ class DatabaseResource extends Resource
             ])
             ->toolbarActions([
                 CreateAction::make('new')
-                    ->hiddenLabel()->iconButton()->iconSize(IconSize::ExtraLarge)
-                    ->icon(fn () => $server->databases()->count() >= $server->database_limit ? 'tabler-database-x' : 'tabler-database-plus')
+                    ->hiddenLabel()
+                    ->icon(fn () => $server->databases()->count() >= $server->database_limit ? TablerIcon::DatabaseX : TablerIcon::DatabasePlus)
                     ->tooltip(fn () => $server->databases()->count() >= $server->database_limit ? trans('server/database.limit') : trans('server/database.create_database'))
                     ->disabled(fn () => $server->databases()->count() >= $server->database_limit)
                     ->color(fn () => $server->databases()->count() >= $server->database_limit ? 'danger' : 'primary')
@@ -180,7 +180,7 @@ class DatabaseResource extends Resource
                                     ->label(trans('server/database.name'))
                                     ->columnSpan(1)
                                     ->prefix('s'. $server->id . '_')
-                                    ->hintIcon('tabler-question-mark', trans('server/database.name_hint')),
+                                    ->hintIcon(TablerIcon::QuestionMark, trans('server/database.name_hint')),
                                 TextInput::make('remote')
                                     ->label(trans('server/database.connections_from'))
                                     ->columnSpan(1)
@@ -208,31 +208,6 @@ class DatabaseResource extends Resource
                         }
                     }),
             ]);
-    }
-
-    public static function canViewAny(): bool
-    {
-        return user()?->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
-    }
-
-    public static function canView(Model $record): bool
-    {
-        return user()?->can(Permission::ACTION_DATABASE_READ, Filament::getTenant());
-    }
-
-    public static function canCreate(): bool
-    {
-        return user()?->can(Permission::ACTION_DATABASE_CREATE, Filament::getTenant());
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return user()?->can(Permission::ACTION_DATABASE_UPDATE, Filament::getTenant());
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return user()?->can(Permission::ACTION_DATABASE_DELETE, Filament::getTenant());
     }
 
     /** @return array<string, PageRegistration> */

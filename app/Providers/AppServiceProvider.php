@@ -22,10 +22,12 @@ use App\Models\Server;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\UserSSHKey;
+use App\Services\Helpers\PluginService;
 use App\Services\Helpers\SoftwareVersionService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Application;
@@ -105,9 +107,7 @@ class AppServiceProvider extends ServiceProvider
             ]);
         }
 
-        Gate::before(function (User $user, $ability) {
-            return $user->isRootAdmin() ? true : null;
-        });
+        Gate::before(fn (User $user, $ability) => $user->isRootAdmin() ? true : null);
 
         AboutCommand::add('Pelican', [
             'Panel Version' => $versionService->currentPanelVersion(),
@@ -125,6 +125,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
+
         Scramble::ignoreDefaultRoutes();
+
+        /** @var PluginService $pluginService */
+        $pluginService = app(PluginService::class); // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
+
+        $pluginService->loadPlugins();
     }
 }

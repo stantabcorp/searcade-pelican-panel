@@ -7,7 +7,7 @@ use App\Models\Egg;
 use App\Services\Eggs\Sharing\EggExporterService;
 use Exception;
 use Illuminate\Console\Command;
-use JsonException;
+use Illuminate\Support\Facades\Http;
 use Symfony\Component\Yaml\Yaml;
 
 class CheckEggUpdatesCommand extends Command
@@ -21,14 +21,12 @@ class CheckEggUpdatesCommand extends Command
             try {
                 $this->check($egg, $exporterService);
             } catch (Exception $exception) {
-                $this->error("{$egg->name}: Error ({$exception->getMessage()})");
+                $this->error("$egg->name: Error ({$exception->getMessage()})");
             }
         }
     }
 
-    /**
-     * @throws JsonException
-     */
+    /** @throws Exception */
     private function check(Egg $egg, EggExporterService $exporterService): void
     {
         if (is_null($egg->update_url)) {
@@ -44,9 +42,13 @@ class CheckEggUpdatesCommand extends Command
             ? Yaml::parse($exporterService->handle($egg->id, EggFormat::YAML))
             : json_decode($exporterService->handle($egg->id, EggFormat::JSON), true);
 
-        $remote = file_get_contents($egg->update_url);
-        assert($remote !== false);
+        $remote = Http::timeout(5)->connectTimeout(1)->get($egg->update_url);
 
+        if ($remote->failed()) {
+            throw new Exception("HTTP request returned status code {$remote->status()}");
+        }
+
+        $remote = $remote->body();
         $remote = $isYaml ? Yaml::parse($remote) : json_decode($remote, true);
 
         unset($local['exported_at'], $remote['exported_at']);

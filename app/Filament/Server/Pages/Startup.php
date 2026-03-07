@@ -2,12 +2,14 @@
 
 namespace App\Filament\Server\Pages;
 
+use App\Enums\SubuserPermission;
+use App\Enums\TablerIcon;
 use App\Facades\Activity;
 use App\Filament\Components\Actions\PreviewStartupAction;
 use App\Filament\Components\Forms\Fields\StartupVariable;
-use App\Models\Permission;
 use App\Models\Server;
 use App\Models\ServerVariable;
+use BackedEnum;
 use Exception;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
@@ -24,7 +26,7 @@ use Illuminate\Support\Facades\Validator;
 
 class Startup extends ServerFormPage
 {
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-player-play';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::PlayerPlay;
 
     protected static ?int $navigationSort = 9;
 
@@ -51,7 +53,7 @@ class Startup extends ServerFormPage
                     ->label(trans('server/startup.command'))
                     ->live()
                     ->visible(fn (Server $server) => in_array($server->startup, $server->egg->startup_commands))
-                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_UPDATE, $server))
+                    ->disabled(fn (Server $server) => !user()?->can(SubuserPermission::StartupUpdate, $server))
                     ->formatStateUsing(fn (Server $server) => $server->startup)
                     ->afterStateUpdated(function ($state, Server $server, Set $set) {
                         $original = $server->startup;
@@ -85,7 +87,7 @@ class Startup extends ServerFormPage
                     ->label(trans('server/startup.docker_image'))
                     ->live()
                     ->visible(fn (Server $server) => in_array($server->image, $server->egg->docker_images))
-                    ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_DOCKER_IMAGE, $server))
+                    ->disabled(fn (Server $server) => !user()?->can(SubuserPermission::StartupDockerImage, $server))
                     ->afterStateUpdated(function ($state, Server $server) {
                         $original = $server->image;
                         $server->forceFill(['image' => $state])->saveOrFail();
@@ -123,7 +125,7 @@ class Startup extends ServerFormPage
                                 return $query->where('egg_variables.user_viewable', true)->orderByPowerJoins('variable.sort');
                             })
                             ->grid()
-                            ->disabled(fn (Server $server) => !user()?->can(Permission::ACTION_STARTUP_UPDATE, $server))
+                            ->disabled(fn (Server $server) => !user()?->can(SubuserPermission::StartupUpdate, $server))
                             ->reorderable(false)->addable(false)->deletable(false)
                             ->schema([
                                 StartupVariable::make('variable_value')
@@ -139,20 +141,23 @@ class Startup extends ServerFormPage
 
     protected function authorizeAccess(): void
     {
-        abort_unless(user()?->can(Permission::ACTION_STARTUP_READ, Filament::getTenant()), 403);
+        abort_unless(user()?->can(SubuserPermission::StartupRead, Filament::getTenant()), 403);
     }
 
     public static function canAccess(): bool
     {
-        return parent::canAccess() && user()?->can(Permission::ACTION_STARTUP_READ, Filament::getTenant());
+        return parent::canAccess() && user()?->can(SubuserPermission::StartupRead, Filament::getTenant());
     }
 
-    public function update(?string $state, ServerVariable $serverVariable): null
+    public function update(?string $state, ServerVariable $serverVariable): void
     {
+        if (!$serverVariable->variable->user_editable) {
+            return;
+        }
+
         $original = $serverVariable->variable_value;
 
         try {
-
             $validator = Validator::make(
                 ['variable_value' => $state],
                 ['variable_value' => $serverVariable->variable->rules]
@@ -165,7 +170,7 @@ class Startup extends ServerFormPage
                     ->danger()
                     ->send();
 
-                return null;
+                return;
             }
 
             ServerVariable::query()->updateOrCreate([
@@ -184,6 +189,7 @@ class Startup extends ServerFormPage
                     ])
                     ->log();
             }
+
             Notification::make()
                 ->title(trans('server/startup.update', ['variable' => $serverVariable->variable->name]))
                 ->body(fn () => $original . ' -> ' . $state)
@@ -196,8 +202,6 @@ class Startup extends ServerFormPage
                 ->danger()
                 ->send();
         }
-
-        return null;
     }
 
     public function getTitle(): string

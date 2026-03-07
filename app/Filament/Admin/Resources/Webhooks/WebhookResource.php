@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Webhooks;
 
+use App\Enums\TablerIcon;
 use App\Enums\WebhookType;
 use App\Filament\Admin\Resources\Webhooks\Pages\CreateWebhookConfiguration;
 use App\Filament\Admin\Resources\Webhooks\Pages\EditWebhookConfiguration;
@@ -13,8 +14,10 @@ use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
 use App\Traits\Filament\CanModifyForm;
 use App\Traits\Filament\CanModifyTable;
+use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -52,7 +55,7 @@ class WebhookResource extends Resource
 
     protected static ?string $model = WebhookConfiguration::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-webhook';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::Webhook;
 
     protected static ?string $recordTitleAttribute = 'description';
 
@@ -98,7 +101,7 @@ class WebhookResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make()
-                    ->hidden(fn (WebhookConfiguration $record) => static::canEdit($record)),
+                    ->hidden(fn (WebhookConfiguration $record) => static::getEditAuthorizationResponse($record)->allowed()),
                 EditAction::make(),
                 ReplicateAction::make()
                     ->iconButton()
@@ -108,15 +111,15 @@ class WebhookResource extends Resource
                     ->beforeReplicaSaved(fn (WebhookConfiguration $replica) => $replica->description .= ' Copy ' . now()->format('Y-m-d H:i:s'))
                     ->successRedirectUrl(fn (WebhookConfiguration $replica) => EditWebhookConfiguration::getUrl(['record' => $replica])),
             ])
-            ->groupedBulkActions([
-                DeleteBulkAction::make(),
+            ->toolbarActions([
+                CreateAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make('exclude_bulk_delete'),
+                ]),
             ])
-            ->emptyStateIcon('tabler-webhook')
+            ->emptyStateIcon(TablerIcon::Webhook)
             ->emptyStateDescription('')
             ->emptyStateHeading(trans('admin/webhook.no_webhooks'))
-            ->emptyStateActions([
-                CreateAction::make(),
-            ])
             ->persistFiltersInSession()
             ->filters([
                 SelectFilter::make('type')
@@ -147,9 +150,9 @@ class WebhookResource extends Resource
                     ->schema(fn () => self::getRegularFields())
                     ->headerActions([
                         Action::make('reset_headers')
-                            ->label(trans('admin/webhook.reset_headers'))
+                            ->tooltip(trans('admin/webhook.reset_headers'))
                             ->color('danger')
-                            ->icon('heroicon-o-trash')
+                            ->icon(TablerIcon::Restore)
                             ->action(fn (Get $get, Set $set) => $set('headers', [
                                 'X-Webhook-Event' => '{{event}}',
                             ])),
@@ -334,7 +337,7 @@ class WebhookResource extends Resource
         AlertBanner::make('discord_webhook_help')
             ->title(trans('admin/webhook.help'))
             ->body(trans('admin/webhook.help_text'))
-            ->icon('tabler-question-mark')
+            ->icon(TablerIcon::QuestionMark)
             ->info()
             ->send();
     }

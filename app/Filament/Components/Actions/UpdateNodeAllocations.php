@@ -2,6 +2,7 @@
 
 namespace App\Filament\Components\Actions;
 
+use App\Enums\TablerIcon;
 use App\Models\Allocation;
 use App\Models\Node;
 use Exception;
@@ -20,9 +21,9 @@ class UpdateNodeAllocations extends Action
     {
         parent::setUp();
 
-        $this->label(trans('admin/node.bulk_update_ip'));
+        $this->tooltip(trans('admin/node.bulk_update_ip'));
 
-        $this->icon('tabler-replace');
+        $this->icon(TablerIcon::Replace);
 
         $this->color('warning');
 

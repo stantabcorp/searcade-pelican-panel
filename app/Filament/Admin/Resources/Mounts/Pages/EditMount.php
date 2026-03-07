@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Mounts\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Mounts\MountResource;
 use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
@@ -22,7 +23,12 @@ class EditMount extends EditRecord
     {
         return [
             DeleteAction::make(),
-            $this->getSaveFormAction()->formId('form'),
+            Action::make('save')
+                ->hiddenLabel()
+                ->action('save')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/edit-record.form.actions.save.label'))
+                ->icon(TablerIcon::DeviceFloppy),
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Roles\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Roles\RoleResource;
 use App\Models\Role;
 use App\Traits\Filament\CanCustomizeHeaderActions;
@@ -57,8 +58,14 @@ class EditRole extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->disabled(fn (Role $role) => $role->isRootAdmin() || $role->users_count >= 1)
-                ->label(fn (Role $role) => $role->isRootAdmin() ? trans('admin/role.root_admin_delete') : ($role->users_count >= 1 ? trans('admin/role.in_use') : trans('filament-actions::delete.single.label'))),            $this->getSaveFormAction()->formId('form'),
+                ->tooltip(fn (Role $role) => $role->isRootAdmin() ? trans('admin/role.root_admin_delete') : ($role->users_count >= 1 ? trans('admin/role.in_use') : trans('filament-actions::delete.single.label')))
+                ->disabled(fn (Role $role) => $role->isRootAdmin() || $role->users_count >= 1),
+            Action::make('save')
+                ->hiddenLabel()
+                ->action('save')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/edit-record.form.actions.save.label'))
+                ->icon(TablerIcon::DeviceFloppy),
         ];
     }
 

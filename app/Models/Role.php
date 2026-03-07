@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\RolePermissionModels;
 use App\Enums\RolePermissionPrefixes;
+use App\Enums\TablerIcon;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -52,6 +54,18 @@ class Role extends BaseRole
         'panelLog' => [
             'view',
         ],
+        'plugin' => [
+            'viewList',
+            'create',
+            'update',
+            'delete',
+        ],
+    ];
+
+    public const MODEL_ICONS = [
+        'health' => TablerIcon::Heart,
+        'activityLog' => TablerIcon::Stack,
+        'panelLog' => TablerIcon::FileInfo,
     ];
 
     /** @var array<string, array<string>> */
@@ -77,6 +91,14 @@ class Role extends BaseRole
         static::registerCustomPermissions([
             $model => $permissions,
         ]);
+    }
+
+    /** @var array<string, string|BackedEnum> */
+    protected static array $customModelIcons = [];
+
+    public static function registerCustomModelIcon(string $model, string|BackedEnum $icon): void
+    {
+        static::$customModelIcons[$model] = $icon;
     }
 
     /** @return array<string, array<string>> */
@@ -122,6 +144,31 @@ class Role extends BaseRole
         }
 
         return $allPermissions;
+    }
+
+    public static function getModelIcon(string $model): null|string|BackedEnum
+    {
+        $customModels = array_merge(static::MODEL_ICONS, static::$customModelIcons);
+
+        if (array_key_exists($model, $customModels)) {
+            return $customModels[$model];
+        }
+
+        $model = ucwords($model);
+
+        if (class_exists($class = '\\App\\Filament\\Admin\\Resources\\' . $model . 's\\' . $model . 'Resource')) {
+            return $class::getNavigationIcon();
+        }
+
+        if (class_exists($class = '\\App\\Filament\\Admin\\Pages\\' . $model)) {
+            return $class::getNavigationIcon();
+        }
+
+        if (class_exists($class = '\\App\\Filament\\Server\\Resources\\' . $model . 's\\' . $model . 'Resource')) {
+            return $class::getNavigationIcon();
+        }
+
+        return null;
     }
 
     public function isRootAdmin(): bool

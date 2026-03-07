@@ -3,6 +3,7 @@
 namespace App\Filament\Components\Actions;
 
 use App\Enums\EggFormat;
+use App\Enums\TablerIcon;
 use App\Models\Egg;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
@@ -19,9 +20,11 @@ class ExportEggAction extends Action
     {
         parent::setUp();
 
-        $this->label(trans('filament-actions::export.modal.actions.export.label'));
+        $this->tooltip(trans('filament-actions::export.modal.actions.export.label'));
 
-        $this->tableIcon('tabler-download');
+        $this->icon(TablerIcon::Download);
+
+        $this->tableIcon(TablerIcon::Download);
 
         $this->authorize(fn () => user()?->can('export egg'));
 
@@ -38,11 +41,11 @@ class ExportEggAction extends Action
         $this->modalFooterActionsAlignment(Alignment::Center);
 
         $this->modalFooterActions([
-            Action::make('json')
+            Action::make('exclude_json')
                 ->label(trans('admin/egg.export.as', ['format' => 'json']))
                 ->url(fn (Egg $egg) => route('api.application.eggs.eggs.export', ['egg' => $egg, 'format' => EggFormat::JSON->value]), true)
                 ->close(),
-            Action::make('yaml')
+            Action::make('exclude_yaml')
                 ->label(trans('admin/egg.export.as', ['format' => 'yaml']))
                 ->url(fn (Egg $egg) => route('api.application.eggs.eggs.export', ['egg' => $egg, 'format' => EggFormat::YAML->value]), true)
                 ->close(),

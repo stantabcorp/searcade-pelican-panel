@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Webhooks\Pages;
 
+use App\Enums\TablerIcon;
 use App\Enums\WebhookType;
 use App\Filament\Admin\Resources\Webhooks\WebhookResource;
 use App\Traits\Filament\CanCustomizeHeaderActions;
@@ -23,8 +24,16 @@ class CreateWebhookConfiguration extends CreateRecord
     protected function getDefaultHeaderActions(): array
     {
         return [
-            $this->getCancelFormAction()->formId('form'),
-            $this->getCreateFormAction()->formId('form'),
+            $this->getCancelFormAction()->formId('form')
+                ->hiddenLabel()
+                ->tooltip(trans('filament-panels::resources/pages/create-record.form.actions.cancel.label'))
+                ->icon(TablerIcon::ArrowLeft),
+            Action::make('create')
+                ->hiddenLabel()
+                ->action('create')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/create-record.form.actions.create.label'))
+                ->icon(TablerIcon::Plus),
         ];
     }
 

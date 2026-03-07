@@ -5,11 +5,11 @@
 		{$CADDY_STRICT_PROXIES}
 	}
 	admin off
-	auto_https off
-	email {$ADMIN_EMAIL}
+	{$CADDY_AUTO_HTTPS}
+	{$CADDY_LE_EMAIL}
 }
 
-{$APP_URL} {
+{$CADDY_APP_URL} {
 	root * /var/www/html/public
 	encode gzip
 

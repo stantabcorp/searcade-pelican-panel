@@ -4,6 +4,8 @@ namespace App\Filament\Pages\Auth;
 
 use App\Extensions\Captcha\CaptchaService;
 use App\Extensions\OAuth\OAuthService;
+use BladeUI\Icons\Exceptions\SvgNotFound;
+use BladeUI\Icons\Factory as IconFactory;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Forms\Components\TextInput;
@@ -19,10 +21,13 @@ class Login extends BaseLogin
 
     protected CaptchaService $captchaService;
 
-    public function boot(OAuthService $oauthService, CaptchaService $captchaService): void
+    protected IconFactory $iconFactory;
+
+    public function boot(OAuthService $oauthService, CaptchaService $captchaService, IconFactory $iconFactory): void
     {
         $this->oauthService = $oauthService;
         $this->captchaService = $captchaService;
+        $this->iconFactory = $iconFactory;
     }
 
     public function form(Schema $schema): Schema
@@ -66,6 +71,14 @@ class Login extends BaseLogin
             ->extraInputAttributes(['tabindex' => 1]);
     }
 
+    protected function getPasswordFormComponent(): Component
+    {
+        /** @var TextInput $component */
+        $component = parent::getPasswordFormComponent();
+
+        return $component->extraInputAttributes(['tabindex' => 2]);
+    }
+
     protected function getOAuthFormComponent(): Component
     {
         $actions = [];
@@ -76,10 +89,22 @@ class Login extends BaseLogin
 
             $id = $schema->getId();
 
+            $color = $schema->getHexColor();
+            $color = is_string($color) ? Color::hex($color) : null;
+
+            $icon = $schema->getIcon();
+            if (is_string($icon)) {
+                try {
+                    $this->iconFactory->svg($icon);
+                } catch (SvgNotFound) {
+                    $icon = null;
+                }
+            }
+
             $actions[] = Action::make("oauth_$id")
                 ->label($schema->getName())
-                ->icon($schema->getIcon())
-                ->color(Color::hex($schema->getHexColor()))
+                ->icon($icon)
+                ->color($color)
                 ->url(route('auth.oauth.redirect', ['driver' => $id], false));
         }
 

@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Enums\TablerIcon;
+use App\Services\Helpers\PluginService;
 use Boquizo\FilamentLogViewer\FilamentLogViewerPlugin;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -11,7 +13,7 @@ class AppPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return parent::panel($panel)
+        $panel = parent::panel($panel)
             ->id('app')
             ->default()
             ->breadcrumbs(false)
@@ -21,7 +23,7 @@ class AppPanelProvider extends PanelProvider
                 Action::make('to_admin')
                     ->label(trans('profile.admin'))
                     ->url(fn () => Filament::getPanel('admin')->getUrl())
-                    ->icon('tabler-arrow-forward')
+                    ->icon(TablerIcon::ArrowForward)
                     ->visible(fn () => user()?->canAccessPanel(Filament::getPanel('admin'))),
             ])
             ->discoverResources(in: app_path('Filament/App/Resources'), for: 'App\\Filament\\App\\Resources')
@@ -29,5 +31,12 @@ class AppPanelProvider extends PanelProvider
                 FilamentLogViewerPlugin::make()
                     ->authorize(false),
             ]);
+
+        /** @var PluginService $pluginService */
+        $pluginService = app(PluginService::class); // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
+
+        $pluginService->loadPanelPlugins($panel);
+
+        return $panel;
     }
 }

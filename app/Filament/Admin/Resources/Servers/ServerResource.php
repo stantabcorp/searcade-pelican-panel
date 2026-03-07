@@ -3,14 +3,17 @@
 namespace App\Filament\Admin\Resources\Servers;
 
 use App\Enums\CustomizationKey;
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Servers\Pages\CreateServer;
 use App\Filament\Admin\Resources\Servers\Pages\EditServer;
 use App\Filament\Admin\Resources\Servers\Pages\ListServers;
 use App\Filament\Admin\Resources\Servers\RelationManagers\AllocationsRelationManager;
+use App\Filament\Admin\Resources\Servers\RelationManagers\DatabasesRelationManager;
 use App\Models\Mount;
 use App\Models\Server;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
+use BackedEnum;
 use Exception;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Resources\Pages\PageRegistration;
@@ -26,7 +29,7 @@ class ServerResource extends Resource
 
     protected static ?string $model = Server::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-brand-docker';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::BrandDocker;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -86,6 +89,7 @@ class ServerResource extends Resource
     {
         return [
             AllocationsRelationManager::class,
+            DatabasesRelationManager::class,
         ];
     }
 

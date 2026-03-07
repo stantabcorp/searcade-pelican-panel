@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Roles;
 
 use App\Enums\CustomizationKey;
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Roles\Pages\CreateRole;
 use App\Filament\Admin\Resources\Roles\Pages\EditRole;
 use App\Filament\Admin\Resources\Roles\Pages\ListRoles;
@@ -15,6 +16,7 @@ use App\Traits\Filament\CanModifyTable;
 use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -44,7 +46,7 @@ class RoleResource extends Resource
 
     protected static ?string $model = Role::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-users-group';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::UsersGroup;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -98,19 +100,16 @@ class RoleResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make()
-                    ->hidden(fn ($record) => static::canEdit($record)),
+                    ->hidden(fn ($record) => static::getEditAuthorizationResponse($record)->allowed()),
                 EditAction::make(),
             ])
-            ->checkIfRecordIsSelectableUsing(fn (Role $role) => !$role->isRootAdmin() && $role->users_count <= 0)
-            ->groupedBulkActions([
-                DeleteBulkAction::make(),
-            ])
-            ->emptyStateIcon('tabler-users-group')
-            ->emptyStateDescription('')
-            ->emptyStateHeading(trans('admin/role.no_roles'))
-            ->emptyStateActions([
+            ->toolbarActions([
                 CreateAction::make(),
-            ]);
+                BulkActionGroup::make([
+                    DeleteBulkAction::make('exclude_bulk_delete'),
+                ]),
+            ])
+            ->checkIfRecordIsSelectableUsing(fn (Role $role) => !$role->isRootAdmin() && $role->users_count <= 0);
     }
 
     /**
@@ -124,7 +123,7 @@ class RoleResource extends Resource
             $options = [];
 
             foreach ($permissions as $permission) {
-                $options[$permission . ' ' . strtolower($model)] = Str::headline($permission);
+                $options[$permission . ' ' . $model] = Str::headline($permission);
             }
 
             $permissionSections[] = self::makeSection($model, $options);
@@ -167,23 +166,11 @@ class RoleResource extends Resource
      */
     private static function makeSection(string $model, array $options): Section
     {
-        $model = ucwords($model);
-
-        $icon = null;
-
-        if (class_exists('\App\Filament\Admin\Resources\\' . $model . 'Resource')) {
-            $icon = ('\App\Filament\Admin\Resources\\' . $model . 'Resource')::getNavigationIcon();
-        } elseif (class_exists('\App\Filament\Admin\Pages\\' . $model)) {
-            $icon = ('\App\Filament\Admin\Pages\\' . $model)::getNavigationIcon();
-        } elseif (class_exists('\App\Filament\Server\Resources\\' . $model . 'Resource')) {
-            $icon = ('\App\Filament\Server\Resources\\' . $model . 'Resource')::getNavigationIcon();
-        }
-
         return Section::make(Str::headline($model))
             ->columnSpan(1)
             ->collapsible()
             ->collapsed()
-            ->icon($icon)
+            ->icon(Role::getModelIcon($model))
             ->headerActions([
                 Action::make('count')
                     ->label(fn (Get $get) => count($get(strtolower($model) . '_list')))

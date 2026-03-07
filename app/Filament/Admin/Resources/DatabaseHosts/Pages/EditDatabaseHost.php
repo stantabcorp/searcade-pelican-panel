@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\DatabaseHosts\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\DatabaseHosts\DatabaseHostResource;
 use App\Models\DatabaseHost;
 use App\Services\Databases\Hosts\HostUpdateService;
@@ -35,9 +36,14 @@ class EditDatabaseHost extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->label(fn (DatabaseHost $databaseHost) => $databaseHost->databases()->count() > 0 ? trans('admin/databasehost.delete_help') : trans('filament-actions::delete.single.modal.actions.delete.label'))
+                ->tooltip(fn (DatabaseHost $databaseHost) => $databaseHost->databases()->count() > 0 ? trans('admin/databasehost.delete_help') : trans('filament-actions::delete.single.modal.actions.delete.label'))
                 ->disabled(fn (DatabaseHost $databaseHost) => $databaseHost->databases()->count() > 0),
-            $this->getSaveFormAction()->formId('form'),
+            Action::make('save')
+                ->hiddenLabel()
+                ->action('save')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/edit-record.form.actions.save.label'))
+                ->icon(TablerIcon::DeviceFloppy),
         ];
     }
 
@@ -59,7 +65,7 @@ class EditDatabaseHost extends EditRecord
                 ->title(trans('admin/databasehost.error'))
                 ->body($exception->getMessage())
                 ->color('danger')
-                ->icon('tabler-database')
+                ->icon(TablerIcon::Database)
                 ->danger()
                 ->send();
 

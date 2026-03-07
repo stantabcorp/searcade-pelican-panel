@@ -3,6 +3,7 @@
 namespace App\Filament\Components\Forms\Fields;
 
 use App\Enums\StartupVariableType;
+use App\Enums\TablerIcon;
 use App\Models\ServerVariable;
 use Closure;
 use Filament\Forms\Components\Concerns\HasAffixes;
@@ -46,7 +47,7 @@ class StartupVariable extends Field
 
         $this->prefix(fn (StartupVariable $component) => '{{' . $component->getVariableEnv() . '}}');
 
-        $this->hintIcon('tabler-code', fn (StartupVariable $component) => implode('|', $component->getVariableRules()));
+        $this->hintIcon(TablerIcon::Code, fn (StartupVariable $component) => implode('|', $component->getVariableRules()));
 
         $this->helperText(fn (StartupVariable $component) => !$component->getVariableDesc() ? '—' : $component->getVariableDesc());
 
@@ -83,6 +84,8 @@ class StartupVariable extends Field
         $this->variableDefault(fn (Get $get) => $get('default_value'));
         $this->variableRules(fn (Get $get) => $get('rules'));
 
+        $this->disabled(fn (Get $get) => !$get('user_editable'));
+
         return $this;
     }
 
@@ -93,6 +96,8 @@ class StartupVariable extends Field
         $this->variableEnv(fn (?ServerVariable $record) => $record?->variable->env_variable);
         $this->variableDefault(fn (?ServerVariable $record) => $record?->variable->default_value);
         $this->variableRules(fn (?ServerVariable $record) => $record?->variable->rules);
+
+        $this->disabled(fn (?ServerVariable $record) => !$record?->variable->user_editable);
 
         return $this;
     }

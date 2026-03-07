@@ -7,6 +7,7 @@ use App\Models\Egg;
 use App\Models\EggVariable;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
 class EggExporterService
@@ -17,6 +18,7 @@ class EggExporterService
     public function handle(int $egg, EggFormat $format): string
     {
         $egg = Egg::with(['scriptFrom', 'configFrom', 'variables'])->findOrFail($egg);
+        $imageBase64 = $this->getEggImageAsBase64($egg);
 
         $struct = [
             '_comment' => 'DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PANEL',
@@ -29,7 +31,7 @@ class EggExporterService
             'author' => $egg->author,
             'uuid' => $egg->uuid,
             'description' => $egg->description,
-            'image' => $egg->image,
+            'image' => $imageBase64,
             'tags' => $egg->tags,
             'features' => $egg->features,
             'docker_images' => $egg->docker_images,
@@ -60,6 +62,24 @@ class EggExporterService
         };
     }
 
+    /**
+     * Get the egg image as base64 for export.
+     */
+    private function getEggImageAsBase64(Egg $egg): ?string
+    {
+        foreach (array_keys(Egg::IMAGE_FORMATS) as $ext) {
+            $path = Egg::ICON_STORAGE_PATH . "/$egg->uuid.$ext";
+
+            if (Storage::disk('public')->exists($path)) {
+                $mimeType = Egg::IMAGE_FORMATS[$ext];
+
+                return 'data:' . $mimeType . ';base64,' . base64_encode(Storage::disk('public')->get($path));
+            }
+        }
+
+        return null;
+    }
+
     protected function yamlExport(mixed $data): mixed
     {
         if ($data instanceof Collection) {
@@ -72,7 +92,7 @@ class EggExporterService
                 return $this->yamlExport($decoded);
             }
 
-            return str_replace(["\r\n", '\\r\\n', '\\n'], "\n", $data);
+            return str_replace("\r\n", "\n", $data);
         }
 
         if (is_array($data)) {

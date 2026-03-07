@@ -2,13 +2,13 @@
 
 namespace App\Filament\Admin\Resources\Servers\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Servers\ServerResource;
 use App\Filament\Server\Pages\Console;
 use App\Models\Server;
 use App\Traits\Filament\CanCustomizeHeaderActions;
 use App\Traits\Filament\CanCustomizeHeaderWidgets;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ListRecords;
@@ -90,27 +90,19 @@ class ListServers extends ListRecords
                     ->sortable(),
             ])
             ->recordActions([
-                Action::make('View')
-                    ->label(trans('admin/server.view'))
+                Action::make('view')
+                    ->tooltip(trans('admin/server.view'))
+                    ->icon(TablerIcon::Terminal)
                     ->url(fn (Server $server) => Console::getUrl(panel: 'server', tenant: $server))
                     ->authorize(fn (Server $server) => user()?->canAccessTenant($server)),
                 EditAction::make(),
             ])
-            ->emptyStateIcon('tabler-brand-docker')
-            ->searchable()
-            ->emptyStateDescription('')
-            ->emptyStateHeading(trans('admin/server.no_servers'))
-            ->emptyStateActions([
+            ->toolbarActions([
                 CreateAction::make(),
-            ]);
-    }
-
-    /** @return array<Action|ActionGroup> */
-    protected function getDefaultHeaderActions(): array
-    {
-        return [
-            CreateAction::make()
-                ->hidden(fn () => Server::count() <= 0),
-        ];
+            ])
+            ->searchable()
+            ->emptyStateIcon(TablerIcon::BrandDocker)
+            ->emptyStateDescription('')
+            ->emptyStateHeading(trans('admin/server.no_servers'));
     }
 }

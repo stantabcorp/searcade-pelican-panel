@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        php: [8.2, 8.3, 8.4]
+        php: [8.3, 8.4, 8.5]
     env:
       DB_CONNECTION: sqlite
       DB_DATABASE: testing.sqlite
@@ -61,138 +61,153 @@ jobs:
       - name: Create SQLite file
         run: touch database/testing.sqlite
 
+      - name: Run Migrations
+        run: php artisan migrate --force --seed
+
       - name: Unit tests
-        run: vendor/bin/pest tests/Unit
+        run: vendor/bin/pest tests/Unit --parallel
         env:
           DB_HOST: UNIT_NO_DB
           SKIP_MIGRATIONS: true
 
       - name: Integration tests
-        run: vendor/bin/pest tests/Integration
+        run: vendor/bin/pest tests/Integration --parallel
 
-#  mysql:
-#    name: MySQL
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: true
-#      matrix:
-#        php: [8.2, 8.3, 8.4]
-#        database: ["mysql:8"]
-#    services:
-#      database:
-#        image: ${{ matrix.database }}
-#        env:
-#          MYSQL_ALLOW_EMPTY_PASSWORD: yes
-#          MYSQL_DATABASE: testing
-#        ports:
-#          - 3306
-#        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
-#    env:
-#      DB_CONNECTION: mysql
-#      DB_HOST: 127.0.0.1
-#      DB_DATABASE: testing
-#      DB_USERNAME: root
-#    steps:
-#      - name: Code Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Get cache directory
-#        id: composer-cache
-#        run: |
-#          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-#
-#      - name: Cache
-#        uses: actions/cache@v4
-#        with:
-#          path: ${{ steps.composer-cache.outputs.dir }}
-#          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
-#          restore-keys: |
-#            ${{ runner.os }}-composer-${{ matrix.php }}-
-#
-#      - name: Setup PHP
-#        uses: shivammathur/setup-php@v2
-#        with:
-#          php-version: ${{ matrix.php }}
-#          extensions: bcmath, curl, gd, mbstring, mysql, openssl, pdo, tokenizer, xml, zip
-#          tools: composer:v2
-#          coverage: none
-#
-#      - name: Install dependencies
-#        run: composer install --no-interaction --no-suggest --no-progress --no-scripts
-#
-#      - name: Unit tests
-#        run: vendor/bin/pest tests/Unit
-#        env:
-#          DB_HOST: UNIT_NO_DB
-#          SKIP_MIGRATIONS: true
-#
-#      - name: Integration tests
-#        run: vendor/bin/pest tests/Integration
-#        env:
-#          DB_PORT: ${{ job.services.database.ports[3306] }}
-#          DB_USERNAME: root
-#
-#  mariadb:
-#    name: MariaDB
-#    runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: true
-#      matrix:
-#        php: [8.2, 8.3, 8.4]
-#        database: ["mariadb:10.6", "mariadb:10.11", "mariadb:11.4"]
-#    services:
-#      database:
-#        image: ${{ matrix.database }}
-#        env:
-#          MYSQL_ALLOW_EMPTY_PASSWORD: yes
-#          MYSQL_DATABASE: testing
-#        ports:
-#          - 3306
-#        options: --health-cmd="mariadb-admin ping || mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
-#    env:
-#      DB_CONNECTION: mariadb
-#      DB_HOST: 127.0.0.1
-#      DB_DATABASE: testing
-#      DB_USERNAME: root
-#    steps:
-#      - name: Code Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Get cache directory
-#        id: composer-cache
-#        run: |
-#          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-#
-#      - name: Cache
-#        uses: actions/cache@v4
-#        with:
-#          path: ${{ steps.composer-cache.outputs.dir }}
-#          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
-#          restore-keys: |
-#            ${{ runner.os }}-composer-${{ matrix.php }}-
-#
-#      - name: Setup PHP
-#        uses: shivammathur/setup-php@v2
-#        with:
-#          php-version: ${{ matrix.php }}
-#          extensions: bcmath, curl, gd, mbstring, mysql, openssl, pdo, tokenizer, xml, zip
-#          tools: composer:v2
-#          coverage: none
-#
-#      - name: Install dependencies
-#        run: composer install --no-interaction --no-suggest --no-progress --no-scripts
-#
-#      - name: Unit tests
-#        run: vendor/bin/pest tests/Unit
-#        env:
-#          DB_HOST: UNIT_NO_DB
-#          SKIP_MIGRATIONS: true
-#
-#      - name: Integration tests
-#        run: vendor/bin/pest tests/Integration
-#        env:
-#          DB_PORT: ${{ job.services.database.ports[3306] }}
-#          DB_USERNAME: root
+  mysql:
+    name: MySQL
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [8.5]
+        database: ["mysql:8.4", "mysql:9.6"]
+    services:
+      database:
+        image: ${{ matrix.database }}
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: testing
+      DB_USERNAME: root
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Get cache directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: bcmath, curl, gd, mbstring, mysql, openssl, pdo, tokenizer, xml, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-suggest --no-progress --no-scripts
+
+      - name: Run Migrations
+        run: php artisan migrate --force --seed
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+          DB_USERNAME: root
+
+      - name: Unit tests
+        run: vendor/bin/pest tests/Unit --parallel
+        env:
+          DB_HOST: UNIT_NO_DB
+          SKIP_MIGRATIONS: true
+
+      - name: Integration tests
+        run: vendor/bin/pest tests/Integration --parallel
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+          DB_USERNAME: root
+
+  mariadb:
+    name: MariaDB
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [8.5]
+        database: ["mariadb:10.11", "mariadb:11.4"]
+    services:
+      database:
+        image: ${{ matrix.database }}
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306
+        options: --health-cmd="mariadb-admin ping || mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: testing
+      DB_USERNAME: root
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Get cache directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: bcmath, curl, gd, mbstring, mysql, openssl, pdo, tokenizer, xml, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-suggest --no-progress --no-scripts
+
+      - name: Run Migrations
+        run: php artisan migrate --force --seed
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+          DB_USERNAME: root
+
+      - name: Unit tests
+        run: vendor/bin/pest tests/Unit --parallel
+        env:
+          DB_HOST: UNIT_NO_DB
+          SKIP_MIGRATIONS: true
+
+      - name: Integration tests
+        run: vendor/bin/pest tests/Integration --parallel
+        env:
+          DB_PORT: ${{ job.services.database.ports[3306] }}
+          DB_USERNAME: root
 
   postgresql:
     name: PostgreSQL
@@ -200,8 +215,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        php: [8.2, 8.3, 8.4]
-        database: ["postgres:14"]
+        php: [8.5]
+        database: ["postgres:17", "postgres:18"]
     services:
       database:
         image: ${{ matrix.database }}
@@ -238,6 +253,7 @@ jobs:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -250,11 +266,14 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-suggest --no-progress --no-scripts
 
+      - name: Run Migrations
+        run: php artisan migrate --force --seed
+
       - name: Unit tests
-        run: vendor/bin/pest tests/Unit
+        run: vendor/bin/pest tests/Unit --parallel
         env:
           DB_HOST: UNIT_NO_DB
           SKIP_MIGRATIONS: true
 
       - name: Integration tests
-        run: vendor/bin/pest tests/Integration
+        run: vendor/bin/pest tests/Integration --parallel

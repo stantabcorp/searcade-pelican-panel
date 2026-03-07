@@ -2,7 +2,7 @@
 
 namespace App\Services\Servers;
 
-use App\Models\Permission;
+use App\Enums\SubuserPermission;
 use App\Models\Server;
 use App\Models\Subuser;
 use App\Models\User;
@@ -31,13 +31,22 @@ class GetUserPermissionsService
             'admin.websocket.transfer',
         ];
 
-        if ($isAdmin) {
-            return $isOwner || $user->can('update', $server) ? array_merge(['*'], $adminPermissions) : array_merge([Permission::ACTION_WEBSOCKET_CONNECT], $adminPermissions);
+        if ($isAdmin && ($isOwner || $user->can('update', $server))) {
+            return array_merge(['*'], $adminPermissions);
         }
 
         /** @var Subuser|null $subuser */
         $subuser = $server->subusers()->where('user_id', $user->id)->first();
+        $subuserPermissions = $subuser !== null ? $subuser->permissions : [];
 
-        return $subuser->permissions ?? [];
+        if ($isAdmin) {
+            return array_unique(array_merge(
+                [SubuserPermission::WebsocketConnect->value],
+                $adminPermissions,
+                $subuserPermissions,
+            ));
+        }
+
+        return $subuserPermissions;
     }
 }

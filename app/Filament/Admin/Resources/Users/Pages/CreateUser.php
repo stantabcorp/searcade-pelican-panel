@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Users\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\Role;
 use App\Services\Users\UserCreationService;
@@ -32,7 +33,12 @@ class CreateUser extends CreateRecord
     protected function getDefaultHeaderActions(): array
     {
         return [
-            $this->getCreateFormAction()->formId('form'),
+            Action::make('create')
+                ->hiddenLabel()
+                ->action('create')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/create-record.form.actions.create.label'))
+                ->icon(TablerIcon::UserPlus),
         ];
     }
 

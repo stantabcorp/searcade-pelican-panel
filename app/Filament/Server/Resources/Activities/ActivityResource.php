@@ -2,17 +2,18 @@
 
 namespace App\Filament\Server\Resources\Activities;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Users\Pages\EditUser;
 use App\Filament\Components\Tables\Columns\DateTimeColumn;
 use App\Filament\Server\Resources\Activities\Pages\ListActivities;
 use App\Models\ActivityLog;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Server;
 use App\Models\User;
 use App\Traits\Filament\CanCustomizePages;
 use App\Traits\Filament\CanCustomizeRelations;
 use App\Traits\Filament\CanModifyTable;
+use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -41,7 +42,7 @@ class ActivityResource extends Resource
 
     protected static ?int $navigationSort = 8;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'tabler-stack';
+    protected static string|BackedEnum|null $navigationIcon = TablerIcon::Stack;
 
     protected static bool $isScopedToTenant = false;
 
@@ -117,9 +118,9 @@ class ActivityResource extends Resource
                                 return $user;
                             })
                             ->hintAction(
-                                Action::make('edit')
+                                Action::make('hint_edit')
                                     ->label(trans('filament-actions::edit.single.label'))
-                                    ->icon('tabler-edit')
+                                    ->icon(TablerIcon::Edit)
                                     ->visible(fn (ActivityLog $activityLog) => $activityLog->actor instanceof User && user()?->can('update', $activityLog->actor))
                                     ->url(fn (ActivityLog $activityLog) => EditUser::getUrl(['record' => $activityLog->actor], panel: 'admin'))
                             ),
@@ -162,11 +163,6 @@ class ActivityResource extends Resource
                             ->orWhereIn('users.id', $subusers);
                     });
             });
-    }
-
-    public static function canViewAny(): bool
-    {
-        return user()?->can(Permission::ACTION_ACTIVITY_READ, Filament::getTenant());
     }
 
     /** @return array<string, PageRegistration> */

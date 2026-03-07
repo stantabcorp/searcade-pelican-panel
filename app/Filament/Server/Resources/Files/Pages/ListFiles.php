@@ -2,14 +2,18 @@
 
 namespace App\Filament\Server\Resources\Files\Pages;
 
+use App\Enums\CustomizationKey;
+use App\Enums\EditorLanguages;
+use App\Enums\SubuserPermission;
+use App\Enums\TablerIcon;
 use App\Exceptions\Repository\FileExistsException;
 use App\Facades\Activity;
+use App\Filament\Components\Forms\Fields\MonacoEditor;
 use App\Filament\Components\Tables\Columns\BytesColumn;
 use App\Filament\Components\Tables\Columns\DateTimeColumn;
 use App\Filament\Server\Resources\Files\FileResource;
 use App\Livewire\AlertBanner;
 use App\Models\File;
-use App\Models\Permission;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use App\Services\Nodes\NodeJWTService;
@@ -26,7 +30,6 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -122,7 +125,7 @@ class ListFiles extends ListRecords
                     return self::getUrl(['path' => encode_path(join_paths($this->path, $file->name))]);
                 }
 
-                if (!user()?->can(Permission::ACTION_FILE_READ_CONTENT, $server)) {
+                if (!user()?->can(SubuserPermission::FileReadContent, $server)) {
                     return null;
                 }
 
@@ -130,21 +133,20 @@ class ListFiles extends ListRecords
             })
             ->recordActions([
                 Action::make('view')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_READ, $server))
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileRead, $server))
                     ->label(trans('server/file.actions.open'))
-                    ->icon('tabler-eye')->iconSize(IconSize::Large)
+                    ->icon(TablerIcon::Eye)
                     ->visible(fn (File $file) => $file->is_directory)
                     ->url(fn (File $file) => self::getUrl(['path' => encode_path(join_paths($this->path, $file->name))])),
                 EditAction::make('edit')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_READ_CONTENT, $server))
-                    ->icon('tabler-edit')
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileReadContent, $server))
                     ->visible(fn (File $file) => $file->canEdit())
                     ->url(fn (File $file) => EditFiles::getUrl(['path' => encode_path(join_paths($this->path, $file->name))])),
                 ActionGroup::make([
-                    Action::make('rename')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
+                    Action::make('fm_rename')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
                         ->label(trans('server/file.actions.rename.title'))
-                        ->icon('tabler-forms')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Forms)->iconSize(IconSize::Large)
                         ->schema([
                             TextInput::make('name')
                                 ->label(trans('server/file.actions.rename.file_name'))
@@ -171,10 +173,10 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    Action::make('copy')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_CREATE, $server))
+                    Action::make('fm_copy')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileCreate, $server))
                         ->label(trans('server/file.actions.copy.title'))
-                        ->icon('tabler-copy')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Copy)->iconSize(IconSize::Large)
                         ->visible(fn (File $file) => $file->is_file)
                         ->action(function (File $file) {
                             $this->getDaemonFileRepository()->copyFile(join_paths($this->path, $file->name));
@@ -190,16 +192,16 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    Action::make('download')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_READ_CONTENT, $server))
+                    Action::make('fm_download')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileReadContent, $server))
                         ->label(trans('server/file.actions.download'))
-                        ->icon('tabler-download')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Download)->iconSize(IconSize::Large)
                         ->visible(fn (File $file) => $file->is_file)
                         ->url(fn (File $file) => DownloadFiles::getUrl(['path' => encode_path(join_paths($this->path, $file->name))]), true),
-                    Action::make('move')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
+                    Action::make('fm_move')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
                         ->label(trans('server/file.actions.move.title'))
-                        ->icon('tabler-replace')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Replace)->iconSize(IconSize::Large)
                         ->schema([
                             TextInput::make('location')
                                 ->label(trans('server/file.actions.move.new_location'))
@@ -207,16 +209,18 @@ class ListFiles extends ListRecords
                                 ->required()
                                 ->live(),
                             TextEntry::make('new_location')
-                                ->state(fn (Get $get, File $file) => resolve_path(join_paths($this->path, $get('location') ?? '/', $file->name))),
+                                ->state(fn (Get $get, File $file) => resolve_path(join_paths($this->path, str_ends_with($get('location') ?? '/', '/') ? join_paths($get('location') ?? '/', $file->name) : $get('location') ?? '/'))),
                         ])
                         ->action(function ($data, File $file) {
                             $location = $data['location'];
-                            $files = [['to' => join_paths($location, $file->name), 'from' => $file->name]];
+                            $endsWithSlash = str_ends_with($location, '/');
+                            $to = $endsWithSlash ? join_paths($location, $file->name) : $location;
+                            $files = [['to' => $to, 'from' => $file->name]];
 
                             $this->getDaemonFileRepository()->renameFiles($this->path, $files);
 
                             $oldLocation = join_paths($this->path, $file->name);
-                            $newLocation = resolve_path(join_paths($this->path, $location, $file->name));
+                            $newLocation = resolve_path(join_paths($this->path, $to));
 
                             Activity::event('server:file.rename')
                                 ->property('directory', $this->path)
@@ -233,10 +237,10 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    Action::make('permissions')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
+                    Action::make('fm_permissions')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
                         ->label(trans('server/file.actions.permissions.title'))
-                        ->icon('tabler-license')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::License)->iconSize(IconSize::Large)
                         ->schema([
                             CheckboxList::make('owner')
                                 ->label(trans('server/file.actions.permissions.owner'))
@@ -295,10 +299,10 @@ class ListFiles extends ListRecords
                                 ->success()
                                 ->send();
                         }),
-                    Action::make('archive')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_ARCHIVE, $server))
+                    Action::make('fm_archive')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileArchive, $server))
                         ->label(trans('server/file.actions.archive.title'))
-                        ->icon('tabler-archive')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Archive)->iconSize(IconSize::Large)
                         ->schema([
                             Grid::make(3)
                                 ->schema([
@@ -335,10 +339,10 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    Action::make('unarchive')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_ARCHIVE, $server))
+                    Action::make('fm_unarchive')
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileArchive, $server))
                         ->label(trans('server/file.actions.unarchive.title'))
-                        ->icon('tabler-archive')->iconSize(IconSize::Large)
+                        ->icon(TablerIcon::Archive)->iconSize(IconSize::Large)
                         ->visible(fn (File $file) => $file->isArchive())
                         ->action(function (File $file) {
                             $this->getDaemonFileRepository()->decompressFile($this->path, $file->name);
@@ -357,9 +361,7 @@ class ListFiles extends ListRecords
                         }),
                 ])->iconSize(IconSize::Large),
                 DeleteAction::make()
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_DELETE, $server))
-                    ->hiddenLabel()
-                    ->icon('tabler-trash')->iconSize(IconSize::Large)
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileDelete, $server))
                     ->requiresConfirmation()
                     ->modalHeading(fn (File $file) => trans('filament-actions::delete.single.modal.heading', ['label' => $file->name . ' ' . ($file->is_directory ? 'folder' : 'file')]))
                     ->action(function (File $file) {
@@ -376,8 +378,10 @@ class ListFiles extends ListRecords
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    BulkAction::make('move')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_UPDATE, $server))
+                    BulkAction::make('fm_move')
+                        ->label(trans('server/file.actions.move.title'))
+                        ->icon(TablerIcon::Replace)->iconSize(IconSize::Large)
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileUpdate, $server))
                         ->schema([
                             TextInput::make('location')
                                 ->label(trans('server/file.actions.move.directory'))
@@ -405,8 +409,10 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    BulkAction::make('archive')
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_ARCHIVE, $server))
+                    BulkAction::make('fm_archive')
+                        ->label(trans('server/file.actions.archive.title'))
+                        ->icon(TablerIcon::Archive)->iconSize(IconSize::Large)
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileArchive, $server))
                         ->schema([
                             Grid::make(3)
                                 ->schema([
@@ -445,8 +451,9 @@ class ListFiles extends ListRecords
 
                             $this->refreshPage();
                         }),
-                    DeleteBulkAction::make()
-                        ->authorize(fn () => user()?->can(Permission::ACTION_FILE_DELETE, $server))
+                    DeleteBulkAction::make('fm_delete')
+                        ->successNotificationTitle(null)
+                        ->authorize(fn () => user()?->can(SubuserPermission::FileDelete, $server))
                         ->action(function (Collection $files) {
                             $files = $files->map(fn ($file) => $file['name'])->toArray();
                             $this->getDaemonFileRepository()->deleteFiles($this->path, $files);
@@ -466,9 +473,9 @@ class ListFiles extends ListRecords
                 ]),
 
                 Action::make('new_file')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_CREATE, $server))
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileCreate, $server))
                     ->tooltip(trans('server/file.actions.new_file.title'))
-                    ->hiddenLabel()->icon('tabler-file-plus')->iconButton()->iconSize(IconSize::ExtraLarge)
+                    ->hiddenLabel()->icon(TablerIcon::FilePlus)
                     ->color('primary')
                     ->modalSubmitActionLabel(trans('server/file.actions.new_file.create'))
                     ->action(function ($data) {
@@ -495,12 +502,21 @@ class ListFiles extends ListRecords
                         TextInput::make('name')
                             ->label(trans('server/file.actions.new_file.file_name'))
                             ->required(),
-                        CodeEditor::make('editor')
-                            ->hiddenLabel(),
+                        Select::make('lang')
+                            ->label(trans('server/file.actions.new_file.syntax'))
+                            ->searchable()
+                            ->live()
+                            ->options(EditorLanguages::class)
+                            ->selectablePlaceholder(false)
+                            ->afterStateUpdated(fn ($state) => $this->dispatch('setLanguage', lang: $state))
+                            ->default(EditorLanguages::plaintext->value),
+                        MonacoEditor::make('editor')
+                            ->hiddenLabel()
+                            ->language(fn (Get $get) => $get('lang') ?? 'plaintext'),
                     ]),
                 Action::make('new_folder')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_CREATE, $server))
-                    ->hiddenLabel()->icon('tabler-folder-plus')->iconButton()->iconSize(IconSize::ExtraLarge)
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileCreate, $server))
+                    ->hiddenLabel()->icon(TablerIcon::FolderPlus)
                     ->tooltip(trans('server/file.actions.new_folder.title'))
                     ->color('primary')
                     ->action(function ($data) {
@@ -530,11 +546,11 @@ class ListFiles extends ListRecords
                             ->required(),
                     ]),
                 Action::make('uploadFile')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_CREATE, $server))
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileCreate, $server))
                     ->view('filament.server.pages.file-upload'),
                 Action::make('uploadURL')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_CREATE, $server))
-                    ->hiddenLabel()->icon('tabler-download')->iconButton()->iconSize(IconSize::ExtraLarge)
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileCreate, $server))
+                    ->hiddenLabel()->icon(TablerIcon::WorldDownload)
                     ->tooltip(trans('server/file.actions.upload.from_url'))
                     ->modalHeading(trans('server/file.actions.upload.from_url'))
                     ->color('success')
@@ -555,17 +571,17 @@ class ListFiles extends ListRecords
                             ->url(),
                     ]),
                 Action::make('search')
-                    ->authorize(fn () => user()?->can(Permission::ACTION_FILE_READ, $server))
-                    ->hiddenLabel()->iconButton()->iconSize(IconSize::ExtraLarge)
-                    ->tooltip(trans('server/file.actions.global_search.title'))
+                    ->authorize(fn () => user()?->can(SubuserPermission::FileRead, $server))
+                    ->hiddenLabel()
+                    ->tooltip(trans('server/file.actions.nested_search.title'))
                     ->color('primary')
-                    ->icon('tabler-world-search')
-                    ->modalHeading(trans('server/file.actions.global_search.title'))
-                    ->modalSubmitActionLabel(trans('server/file.actions.global_search.search'))
+                    ->icon(TablerIcon::FolderSearch)
+                    ->modalHeading(trans('server/file.actions.nested_search.title'))
+                    ->modalSubmitActionLabel(trans('server/file.actions.nested_search.search'))
                     ->schema([
                         TextInput::make('searchTerm')
-                            ->label(trans('server/file.actions.global_search.search_term'))
-                            ->placeholder(trans('server/file.actions.global_search.search_term_placeholder'))
+                            ->label(trans('server/file.actions.nested_search.search_term'))
+                            ->placeholder(trans('server/file.actions.nested_search.search_term_placeholder'))
                             ->required()
                             ->regex('/^[^*]*\*?[^*]*$/')
                             ->minValue(3),
@@ -605,7 +621,7 @@ class ListFiles extends ListRecords
         /** @var Server $server */
         $server = Filament::getTenant();
 
-        if (!user()?->can(Permission::ACTION_FILE_CREATE, $server)) {
+        if (!user()?->can(SubuserPermission::FileCreate, $server)) {
             abort(403, 'You do not have permission to upload files.');
         }
 
@@ -640,7 +656,7 @@ class ListFiles extends ListRecords
         /** @var Server $server */
         $server = Filament::getTenant();
 
-        if (!user()?->can(Permission::ACTION_FILE_CREATE, $server)) {
+        if (!user()?->can(SubuserPermission::FileCreate, $server)) {
             abort(403, 'You do not have permission to create folders.');
         }
 
@@ -693,5 +709,25 @@ class ListFiles extends ListRecords
                 ->withoutMiddleware(static::getWithoutRouteMiddleware($panel))
                 ->where('path', '.*'),
         );
+    }
+
+    public function fileUploadAction(): Action
+    {
+        if (user()?->getCustomization(CustomizationKey::ButtonStyle)) {
+            return Action::make('fileUpload')
+                ->iconSize(IconSize::ExtraLarge)
+                ->iconButton()
+                ->color('success')
+                ->icon(TablerIcon::Upload)
+                ->tooltip(trans('server/file.actions.upload.title'))
+                ->extraAttributes(['@click' => 'triggerBrowse']);
+        }
+
+        return Action::make('fileUpload')
+            ->hiddenLabel()
+            ->color('success')
+            ->icon(TablerIcon::Upload)
+            ->tooltip(trans('server/file.actions.upload.title'))
+            ->extraAttributes(['@click' => 'triggerBrowse']);
     }
 }
