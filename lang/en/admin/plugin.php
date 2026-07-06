@@ -20,6 +20,7 @@ return [
     'disable' => 'Disable',
     'import_from_file' => 'Import from File',
     'import_from_url' => 'Import from URL',
+    'file' => 'File',
     'no_plugins' => 'No Plugins',
     'all' => 'All',
     'change_load_order' => 'Change load order',
@@ -45,15 +46,25 @@ return [
     ],
 
     'notifications' => [
+        'goto_plugins' => 'Go to Plugins',
+        'background_info' => 'This process can take a few seconds. You will be notified once it\'s finished.',
+
+        'install_started' => 'Plugin install started in the background',
         'installed' => 'Plugin installed',
         'install_error' => 'Could not install plugin',
+
+        'uninstall_started' => 'Plugin uninstall started in the background',
         'uninstalled' => 'Plugin uninstalled',
         'uninstall_error' => 'Could not uninstall plugin',
-        'deleted' => 'Plugin deleted',
+
+        'update_started' => 'Plugin update started in the background',
         'updated' => 'Plugin updated',
         'update_error' => 'Could not update plugin',
+
         'enabled' => 'Plugin enabled',
         'disabled' => 'Plugin disabled',
+        'deleted' => 'Plugin deleted',
+
         'imported' => 'Plugin imported',
         'import_exists' => 'A plugin with that id already exists',
         'import_failed' => 'Could not import plugin',

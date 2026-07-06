@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 if (!function_exists('is_digit')) {
     /**
      * Deal with normal (and irritating) PHP behavior to determine if
@@ -35,15 +37,22 @@ if (!function_exists('is_ipv6')) {
 if (!function_exists('convert_bytes_to_readable')) {
     function convert_bytes_to_readable(int $bytes, int $decimals = 2, ?int $base = null): string
     {
-        $conversionUnit = config('panel.use_binary_prefix') ? 1024 : 1000;
-        $suffix = config('panel.use_binary_prefix') ? ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB'] : ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        $binarySuffixes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+        $decimalSuffixes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        $suffix = config('panel.use_binary_prefix') ? $binarySuffixes : $decimalSuffixes;
 
         if ($bytes <= 0) {
             return '0 ' . $suffix[0];
         }
 
+        $conversionUnit = config('panel.use_binary_prefix') ? 1024 : 1000;
+
         $fromBase = log($bytes) / log($conversionUnit);
         $base ??= floor($fromBase);
+
+        if ($base > count($suffix) - 1) {
+            $base = count($suffix) - 1;
+        }
 
         return format_number(pow($conversionUnit, $fromBase - $base), precision: $decimals) . ' ' . $suffix[$base];
     }
@@ -130,8 +139,29 @@ if (!function_exists('encode_path')) {
     }
 }
 
+if (!function_exists('convert_to_utf8')) {
+    /**
+     * Convert a string to UTF-8 from an unknown encoding
+     */
+    function convert_to_utf8(string $contents): string
+    {
+        // Valid UTF-8 passes through unchanged
+        if (mb_check_encoding($contents, 'UTF-8')) {
+            return $contents;
+        }
+
+        // Only detect UTF-16 by BOM instead of mb_check_encoding('UTF-16') which can cause false positives
+        if (str_starts_with($contents, "\xFF\xFE") || str_starts_with($contents, "\xFE\xFF")) {
+            return mb_convert_encoding($contents, 'UTF-8', 'UTF-16');
+        }
+
+        // ISO-8859-1 serves as a universal fallback since any byte sequence is valid in it
+        return mb_convert_encoding($contents, 'UTF-8', 'ISO-8859-1');
+    }
+}
+
 if (!function_exists('user')) {
-    function user(): ?App\Models\User
+    function user(): ?User
     {
         return auth(config('auth.defaults.guard', 'web'))->user();
     }

@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Enums\CustomizationKey;
 use App\Enums\TablerIcon;
+use App\Livewire\Passkeys;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -59,9 +60,15 @@ class FilamentServiceProvider extends ServiceProvider
             fn () => Blade::render('@livewire(\App\Livewire\AlertBannerContainer::class)'),
         );
 
+        $appName = config('app.name', 'Pelican');
+
+        if (strtolower($appName) !== 'pelican') {
+            $appName = "{$appName} - Powered by Pelican";
+        }
+
         FilamentView::registerRenderHook(
             PanelsRenderHook::FOOTER,
-            fn () => Blade::render('filament.layouts.footer'),
+            fn () => Blade::render('filament.layouts.footer', ['appName' => $appName]),
         );
 
         FilamentView::registerRenderHook(
@@ -97,15 +104,35 @@ class FilamentServiceProvider extends ServiceProvider
 
         Select::configureUsing(fn (Select $select) => $select->native(false));
 
-        KeyValue::configureUsing(fn (KeyValue $keyValue) => $keyValue->deleteAction(function (Action $action) {
-            $action->tooltip(fn () => $action->getLabel());
-            $action->iconSize(IconSize::Large);
-        }));
+        KeyValue::configureUsing(fn (KeyValue $keyValue) => $keyValue
+            ->addAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+            ->deleteAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+            ->reorderAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+        );
 
-        Repeater::configureUsing(fn (Repeater $repeater) => $repeater->deleteAction(function (Action $action) {
-            $action->tooltip(fn () => $action->getLabel());
-            $action->iconSize(IconSize::Large);
-        }));
+        Repeater::configureUsing(fn (Repeater $repeater) => $repeater
+            ->addAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+            ->deleteAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+            ->reorderAction(function (Action $action) {
+                $action->tooltip(fn () => $action->getLabel());
+                $action->iconSize(IconSize::Large);
+            })
+        );
 
         ShowPasswordAction::configureUsing(function (ShowPasswordAction $action) {
             $action->tooltip(fn () => $action->getLabel());
@@ -257,6 +284,7 @@ class FilamentServiceProvider extends ServiceProvider
 
             SchemaIconAlias::COMPONENTS_WIZARD_COMPLETED_STEP => TablerIcon::Check,
         ]);
+        Livewire::component('filament-passkeys', Passkeys::class);
     }
 
     public function register(): void {}

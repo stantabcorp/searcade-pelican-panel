@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Client\Servers;
 
+use App\Enums\NodeJwtScope;
 use App\Facades\Activity;
 use App\Http\Controllers\Api\Client\ClientApiController;
 use App\Http\Requests\Api\Client\Servers\Files\ChmodFilesRequest;
@@ -77,7 +78,7 @@ class FileController extends ClientApiController
             ->property('file', $request->get('file'))
             ->log();
 
-        return new Response($response, Response::HTTP_OK, ['Content-Type' => 'text/plain']);
+        return new Response(convert_to_utf8($response), Response::HTTP_OK, ['Content-Type' => 'text/plain; charset=utf-8']);
     }
 
     /**
@@ -93,6 +94,7 @@ class FileController extends ClientApiController
     {
         $token = $this->jwtService
             ->setExpiresAt(CarbonImmutable::now()->addMinutes(15))
+            ->setScopes(NodeJwtScope::FileDownload)
             ->setUser($request->user())
             ->setClaims([
                 'file_path' => rawurldecode($request->get('file')),

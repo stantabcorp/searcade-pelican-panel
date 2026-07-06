@@ -70,7 +70,7 @@ class ListServers extends ListRecords
             ImageColumn::make('icon')
                 ->label('')
                 ->imageSize(46)
-                ->state(fn (Server $server) => $server->icon ?: $server->egg->image),
+                ->state(fn (Server $server) => $server->icon ?: $server->egg->icon),
             TextColumn::make('condition')
                 ->label(trans('server/dashboard.status'))
                 ->badge()
@@ -81,7 +81,8 @@ class ListServers extends ListRecords
                 ->label(trans('server/dashboard.title'))
                 ->description(fn (Server $server) => $server->description)
                 ->grow()
-                ->searchable(),
+                ->searchable()
+                ->sortable(),
             TextColumn::make('allocation.address')
                 ->label('')
                 ->badge()
@@ -130,7 +131,7 @@ class ListServers extends ListRecords
             ->contentGrid($usingGrid ? ['default' => 1, 'md' => 2] : null)
             ->emptyStateIcon(TablerIcon::BrandDocker)
             ->emptyStateDescription('')
-            ->emptyStateHeading(fn () => $this->activeTab === 'my' ? 'You don\'t own any servers!' : 'You don\'t have access to any servers!')
+            ->emptyStateHeading(fn () => $this->activeTab === 'my' ? trans('server/dashboard.empty_own') : trans('server/dashboard.empty_other'))
             ->persistFiltersInSession()
             ->filters([
                 SelectFilter::make('egg')

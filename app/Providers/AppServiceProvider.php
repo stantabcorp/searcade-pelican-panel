@@ -10,6 +10,7 @@ use App\Checks\NodeVersionsCheck;
 use App\Checks\PanelVersionCheck;
 use App\Checks\ScheduleCheck;
 use App\Checks\UsedDiskSpaceCheck;
+use App\Http\Responses\LoginResponse;
 use App\Models\Allocation;
 use App\Models\ApiKey;
 use App\Models\Backup;
@@ -36,6 +37,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Laravel\Passkeys\Passkeys;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Health\Facades\Health;
 
@@ -85,6 +88,8 @@ class AppServiceProvider extends ServiceProvider
                 ->baseUrl($node->getConnectionAddress())
         );
 
+        Passkeys::useUserModel(User::class);
+
         Sanctum::usePersonalAccessTokenModel(ApiKey::class);
 
         Gate::define('viewApiDocs', fn () => true);
@@ -125,7 +130,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
+        $this->app->bind(LoginResponseContract::class, LoginResponse::class);
 
         Scramble::ignoreDefaultRoutes();
 

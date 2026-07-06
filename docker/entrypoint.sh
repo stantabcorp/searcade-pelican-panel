@@ -5,7 +5,7 @@
 if [ -f /pelican-data/.env ]; then
   echo ".env vars exist."
   # load specific env vars from .env used in the entrypoint and they are not already set
-  for VAR in "APP_KEY" "APP_INSTALLED" "DB_CONNECTION" "DB_HOST" "DB_PORT"; do
+  for VAR in "APP_KEY" "APP_INSTALLED" "DB_CONNECTION" "DB_HOST" "DB_PORT" "TRUSTED_PROXIES"; do
     echo "checking for ${VAR}"
     ## skip if it looks like it might try to execute code
     if (grep "${VAR}" .env | grep -qE "\$\(|=\`|\$#"); then echo "var in .env may be executable or a comment, skipping"; continue; fi
@@ -31,7 +31,7 @@ else
     echo "Generated app key written to .env file"
   else
     echo "APP_KEY exists in environment, using that."
-    echo "APP_KEY=$APP_KEY" > /pelican-data/.env
+    echo "APP_KEY=${APP_KEY}" > /pelican-data/.env
   fi
 
   # enable installer
@@ -47,7 +47,7 @@ if [ "${APP_INSTALLED}" = "true" ];  then
   if [ "${DB_CONNECTION}" != "sqlite" ]; then
     # check for DB up before starting the panel
     echo "Checking database status."
-    until nc -z -v -w30 $DB_HOST $DB_PORT
+    until nc -z -v -w30 "${DB_HOST}" "${DB_PORT}"
     do
       echo "Waiting for database connection..."
       # wait for 1 seconds before check again
@@ -59,6 +59,8 @@ if [ "${APP_INSTALLED}" = "true" ];  then
   
   # run migration
   php artisan migrate --force
+
+  php artisan p:plugin:composer
 fi
 
 echo "Optimizing Filament"
